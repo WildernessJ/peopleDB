@@ -327,3 +327,19 @@ via the computer tool instead, then confirm the POST in the app log.
   it fails the merge if the working tree has any uncommitted tracked change (or HEAD drifted off the
   gated commit), so a truncated commit no longer sails through. The manual `git status -s` habit above
   is still the first line of defence; `tree-check` is the backstop.
+
+## GitHub repo visibility ≠ ghcr package visibility (and Social preview is public-only)
+
+- **Trigger:** making the repo public and expecting the published container image and the Social-preview
+  setting to follow.
+- **Wrong:** assuming `gh repo edit --visibility public` also publishes the linked ghcr package, so
+  outsiders can `docker pull ghcr.io/wildernessj/peopledb`. They can't — the package stays **private**
+  and the pull 401s. Also assuming the Settings → Social preview upload box exists on a private repo: it
+  doesn't render until the repo is public (GitHub only shows/serves a preview image for public repos), so
+  searching a private repo's settings for "Social preview" finds nothing.
+- **Correct:** treat them as **three independent toggles**. (1) Repo visibility via `gh repo edit`.
+  (2) **Package** visibility is separate — flip it in the package settings UI
+  (`github.com/users/<user>/packages/container/<pkg>/settings` → Change visibility → Public); there's no
+  supported `gh`/REST path and the default `gh` token lacks `write:packages`, so it's a manual step.
+  (3) The **Social preview** image can only be uploaded once the repo is already public. Sequence the
+  go-live runbook accordingly, and don't advertise a `docker pull` in the README until the package is public.

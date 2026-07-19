@@ -19,7 +19,23 @@
 > or exploitable detail on an unmitigated weakness. Refer to deploys generically ("the LAN deploy"). A
 > leaked secret must be rotated, not just edited out.
 
-_Last updated: 2026-07-18 (**#33** shipped via autonomous `/flow --auto` — the first `--auto` run on this
+_Last updated: 2026-07-19 (**peopleDB went PUBLIC and shipped v1.0.0.** After a full-history secret audit
+(no rotatable secret anywhere; the only leaks were home-network topology in the pre-spine
+`docs/context/handoffs/`), removed that directory + scrubbed identity, then **squashed all git history
+into one `initial public release` commit** and added an MIT `LICENSE` (**ADR-0008**). Rewrote the README
+for users — complete feature list, light + dark/teal screenshots captured from a seeded demo instance, a
+logo header + a 1280×640 social-preview banner, and dropped the "Cardhop" framing from product-facing
+copy. Adopted a **tag-based release contract** (`:edge` = tip of `main`; `:latest`/`:X.Y.Z` = releases
+only) over a stable/dev branch split (rejected — git-flow overhead unjustified for a solo project) —
+**ADR-0005 amendment**; bumped version `0.1.0 → 1.0.0`. Ran the go-live runbook: repo flipped **public**,
+tag `v1.0.0` pushed → `docker-publish` **green** (published `:1.0.0`/`:1.0`/`:1`/`:latest`/`:sha-`),
+GitHub Release created. Untracked `.claude/` (maintainer-only tooling; kept on disk). Closed **#34**
+won't-fix (the `get_by_uid` `is_group` residual — the deterministic href tiebreak is sufficient and a
+`UNIQUE(user, uid)` constraint would break the cache-mirrors-server invariant per ADR-0002). **Owed
+(manual, maintainer-only):** make the ghcr **package** public (an independent toggle from repo
+visibility — until done, an outside `docker pull` fails), upload `docs/img/social-preview.png` as the
+repo Social preview (the setting only appears once the repo is public), and point the LAN deploy's
+Watchtower at `:edge` or `:latest`. **Open issues: none.** **Prior:** 2026-07-18 (**#33** shipped via autonomous `/flow --auto` — the first `--auto` run on this
 repo: deterministic `ORDER BY href LIMIT 1` tiebreak in `store.get_by_uid` (`8e63eaa`, merged `31bbc9a`).
 The query had no `ORDER BY`, so a duplicate `(user, uid)` collision returned an arbitrary row; scope held
 to the deterministic tiebreak (issue option 1), UNIQUE-invariant enforcement left out. Machine-verified
@@ -58,13 +74,16 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
   #22/#23/#24 quick-entry line, #25 index widening, #27 field selection, #29 a11y labels,
   **#28 merge duplicate contacts**, #30 hide merge picker on group pages, **#26 reorganize the top
   bar**, a **card-view long-value overflow fix**, **#32 empty field box**, **#31 merge/search
-  group-primary guard**, and **#33 `get_by_uid` deterministic tiebreak** all cleared. **No open
-  enhancements** (#34 is a non-blocking `flow-review` advisory). Deployed and running on the LAN —
-  **current through #33** (`/pb` recreated the container on `:latest` after the #33 merge).
-- **Deployment:** CI publishes images to `ghcr.io/wildernessj/peopledb` on every push to `main`
-  (test-gated). The LAN deploy now runs from the Unraid Docker-tab template (`unraid/peopledb.xml`)
-  pulling `:latest`, off the old hand-built container (behind a reverse proxy). See ADR-0005; deploy
-  gotchas in PITFALLS.
+  group-primary guard**, and **#33 `get_by_uid` deterministic tiebreak** all cleared. **The repo is now
+  PUBLIC and `v1.0.0` is released** (2026-07-19). **No open issues** (#34 closed won't-fix). Deployed
+  and running on the LAN.
+- **Deployment:** CI (test-gated) publishes images to `ghcr.io/wildernessj/peopledb` with a
+  **tag-based contract** (ADR-0005 + 2026-07-19 amendment): `:edge` on every push to `main`;
+  `:X.Y.Z`/`:X.Y`/`:X` + `:latest` on a `v*` release tag (`:latest` = newest non-prerelease only);
+  `:sha-<short>` every build. The LAN deploy runs from the Unraid Docker-tab template
+  (`unraid/peopledb.xml`) behind a reverse proxy; its Watchtower target (`:edge` vs `:latest`) is a
+  post-launch choice. **Owed:** the ghcr *package* must be flipped public (independent of repo
+  visibility) before an outside `docker pull` works. See ADR-0005; deploy gotchas in PITFALLS.
 - **Active gate:** none. Per Coding Workflow v2 — one `/code-review` on the full diff before merge.
 - **Branch:** `main` is the working line; new work starts from `main`.
 - **Verification:** **258 unit tests green + 44 live tests** (`uv run pytest`; `-m live` boots a
@@ -84,6 +103,19 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
 
 ## Recently shipped
 
+- **Public launch + v1.0.0** (2026-07-19) — took the repo public and cut the first release. A
+  read-only full-history secret audit found **no rotatable secret**; the only issues were home-network
+  topology in the pre-spine `docs/context/handoffs/`, so that directory was removed and identity
+  scrubbed, then **all git history was squashed into a single `initial public release` commit**
+  (**ADR-0008**) and an MIT `LICENSE` added. The README was rewritten for users (complete feature list;
+  light + dark/teal screenshots from a seeded throwaway demo; logo header + social-preview banner;
+  "Cardhop" dropped from product-facing copy). Release strategy became a **tag-based contract**
+  (`:edge` = tip of `main`; `:latest`/`:X.Y.Z` = releases only) — a stable/dev branch split was
+  considered and rejected (**ADR-0005 amendment**); version bumped `0.1.0 → 1.0.0`. Go-live runbook
+  executed: repo → **public**, `v1.0.0` tag pushed → `docker-publish` green (published
+  `:1.0.0`/`:1.0`/`:1`/`:latest`/`:sha-`), GitHub Release created. `.claude/` untracked (maintainer
+  tooling, kept local). **#34 closed won't-fix.** Owed manual steps: ghcr package → public, social-preview
+  upload, Watchtower target — see the header and PITFALLS.
 - **#31 merge/search group-primary guard + field-box refactor** (2026-07-18, live `/flow`) — two
   bundled changes. **#31:** `GET /contacts/{uid}/merge/search` excluded groups from the *candidate*
   list but never validated the *primary* `uid` in the path, so `…/{group_uid}/merge/search` returned
@@ -248,16 +280,18 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
 
 ## Next actions
 
-- **Everything shipped is deployed.** `main` is in sync with origin; CI published `:latest`; **#32
-  auto-closed** on push (the merge carried `Closes #32`); `/pb` on 2026-07-17 recreated the LAN
-  container on `:latest`, current through #32. #26/#30 were closed manually earlier (their merge commits
-  omitted `Closes` — see PITFALLS). Nothing awaiting push or redeploy.
-- **Open enhancement — start from the filed issue:**
-  - **#31 `/merge/search` group-uid validation** *(defense-in-depth)* — the route excludes groups from
-    the *candidate* list but doesn't reject a group *primary* uid, so `GET /contacts/{group_uid}/merge/search`
-    returns 200 with candidates. Reachable only by hand-crafted URL (no UI trigger since #30); the actual
-    merge still 400s. Mirror the review-screen guard on the search route.
-  - (ghcr package confirmed **private** 2026-07-15; revisit at the public-visibility flip — see ADR-0005.)
+- **Everything committed is pushed; `main` in sync with origin.** Repo is public, `v1.0.0` released,
+  `docker-publish` green. **No open GitHub issues.**
+- **Owed manual steps (maintainer-only, can't be scripted from here):**
+  - **Make the ghcr *package* public** — repo visibility and package visibility are independent toggles;
+    until this is flipped, an outside `docker pull ghcr.io/wildernessj/peopledb` fails (needs auth), so
+    the README's Docker instructions don't work for others. Package settings → Change visibility → Public.
+  - **Upload the Social preview** — Settings → General → Social preview → upload
+    `docs/img/social-preview.png` (the setting only appears now that the repo is public).
+  - **Point the LAN deploy's Watchtower** at `:edge` (ride `main`, prior behaviour) or `:latest`
+    (releases only) — see the ADR-0005 amendment.
+  - **CI housekeeping (non-urgent):** `docker-publish` logs Node-20 deprecation warnings for the pinned
+    actions (`checkout@v4`, `setup-uv@v5`, the `docker/*` ones); bump to their newer majors when convenient.
 - **Accepted residual from #32 (audit-noted, not filed):** `detail.html`'s box-guard duplicates the
   seven-field list implicit in the `<dl>` body; a future field row added inside the box without updating
   the guard would wrongly suppress the box for a contact that has only that field.
@@ -283,17 +317,17 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
 - **#15 boot rebuild on a large book (accepted):** the one-time `contacts_fts` rebuild runs
   synchronously at app construction; unmeasured on a large address book. Gated (runs once), re-parses
   `contacts.raw` only. Revisit only if a slow first boot after upgrade is observed.
-- **Revisit: 2-tier spine layout?** (raised 2026-07-14 during the vikunja spine rollout.) vikunja adopted
-  a two-tier split — progress files (`PROJECT_STATE`/`RUN_LOG`/`PITFALLS`) kept **local/gitignored**, only
-  ADRs committed — because it's a *public fork of go-vikunja* and personal working notes shouldn't land in
-  someone else's project. peopleDB is different: it's **your own app** (private→public), so its committed,
-  public spine is defensible as the project's real history. Open question: once peopleDB actually goes
-  public, do the progress files stay committed, or move local like vikunja's? Decide before the visibility flip.
+- **Resolved 2026-07-19: the committed public spine stays.** The 2-tier question (raised 2026-07-14 from
+  the vikunja rollout, where progress files are kept local/gitignored because it's a public fork of
+  someone else's project) was decided at the visibility flip: peopleDB is the maintainer's own app, so its
+  `PROJECT_STATE`/`RUN_LOG`/`PITFALLS`/ADRs stay **committed and public** as the project's real history —
+  which is why every spine entry is written to the public-safe bar (no secrets, LAN IPs, or personal
+  detail). Only `.claude/` (the executable hook + checkpoint skill) was untracked, as maintainer tooling.
 
 ## References
 
 - Architecture / invariants / scope: [`../CLAUDE.md`](../CLAUDE.md)
-- Decisions: [DECISIONS/](DECISIONS/) — ADR-0001 (stack), 0002 (CardDAV/sync), 0003 (auth), 0004 (cache concurrency), 0005 (ghcr/Unraid deploy), 0006 (merge delete-last/no-rollback)
+- Decisions: [DECISIONS/](DECISIONS/) — ADR-0001 (stack), 0002 (CardDAV/sync), 0003 (auth), 0004 (cache concurrency), 0005 (ghcr deploy + tag-based release contract), 0006 (merge delete-last/no-rollback), 0007 (shared top-bar partial), 0008 (public-release history squash)
 - Gotchas: [PITFALLS.md](PITFALLS.md)
 - Session history: [RUN_LOG.md](RUN_LOG.md)
 - Specs: `specs/`

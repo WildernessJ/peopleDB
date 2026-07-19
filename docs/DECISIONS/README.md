@@ -31,13 +31,14 @@ their `date:` front matter carries the real decision date; the bodies note the r
 | [ADR-0002](ADR-0002-carddav-sync-model.md) | Hand-rolled CardDAV client + local-cache write-through sync | Enacted | 2026-07-13 | pairs-with 0004 |
 | [ADR-0003](ADR-0003-fernet-inmemory-sessions.md) | Auth via CardDAV credentials + Fernet-encrypted in-memory sessions | Enacted | 2026-07-13 | — |
 | [ADR-0004](ADR-0004-sqlite-thread-local-wal.md) | Thread-local SQLite + WAL + per-user locks for cache concurrency | Enacted | 2026-07-14 | pairs-with 0002 |
-| [ADR-0005](ADR-0005-ghcr-github-actions-deploy.md) | Ship images via GitHub Actions → ghcr.io, deploy on Unraid from `:latest` | Enacted | 2026-07-15 | builds on 0001, 0003 |
+| [ADR-0005](ADR-0005-ghcr-github-actions-deploy.md) | Ship images via GitHub Actions → ghcr.io; tag-based release contract (`:edge`/`:latest`) | Enacted · amended 2026-07-19 | 2026-07-15 | builds on 0001, 0003 |
 | [ADR-0006](ADR-0006-merge-nontransactional-delete-last.md) | Merge is a non-transactional, delete-last sequence with no rollback | Accepted | 2026-07-16 | builds on 0002, 0004 |
 | [ADR-0007](ADR-0007-shared-topbar-partial.md) | One shared top-bar partial; theme/accent/settings controls move in-flow | Accepted | 2026-07-17 | builds on 0001 |
+| [ADR-0008](ADR-0008-public-release-history-squash.md) | Squash history to a single commit for the first public release | Enacted | 2026-07-19 | — |
 
 ## How to add a new ADR
 
-1. **Pick the next number** (never reused, even if an ADR is later superseded) — next is **0008**.
+1. **Pick the next number** (never reused, even if an ADR is later superseded) — next is **0009**.
 2. **Copy [`ADR-TEMPLATE.md`](ADR-TEMPLATE.md)** to `ADR-NNNN-<short-slug>.md`; fill in front matter + body.
 3. If it **supersedes** an existing ADR, set `supersedes:` here and `superseded-by:` + `status:` on the old one.
 4. **Add a row above** and link it from `PROJECT_STATE.md` → References.

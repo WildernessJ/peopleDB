@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-07-19 — public launch: repo → public, v1.0.0 released, README/branding, tag-based releases
+
+- **Goal:** take peopleDB from private to public cleanly — no leaked secrets in permanent history, a
+  user-facing README, and a release/deploy story that makes sense once strangers can pull the image.
+- **Did:**
+  - **Closed #34 won't-fix** — the `get_by_uid` `is_group` residual. The deterministic href tiebreak is
+    sufficient (the #31 merge guard re-checks `is_group` independently), and enforcing `UNIQUE(user, uid)`
+    at the store would make a legitimate server state (two hrefs sharing a UID) unrepresentable, breaking
+    the cache-mirrors-server invariant (ADR-0002). No open issues remain.
+  - **Full-history secret audit** (read-only, all 114 commits + working tree, via the `security` agent).
+    **No rotatable secret found** — no credentials, Fernet keys, or tokens anywhere. The only leaks were
+    **home-network topology** (a real CardDAV hostname + a LAN IP with co-host detail) confined to the
+    pre-spine `docs/context/handoffs/` (present in both the tree and history-only removed files).
+  - **Redacted + squashed:** removed `docs/context/handoffs/` entirely (the whole topology-leak surface,
+    superseded by the spine), scrubbed the maintainer's given name → `WildernessJ` and generalised a
+    private tooling-repo name, fixed the now-dangling references, added an MIT `LICENSE`. Then **squashed
+    all 114 commits into one `initial public release` commit** and force-pushed — chosen over a surgical
+    `filter-repo` because it eliminates history-only leaks by construction (**ADR-0008**). A
+    `pre-squash-backup` git tag holds the old tip locally.
+  - **README rewritten for users:** complete feature list (added the previously-undocumented quick-add
+    parser, list/card + field selection, photo upload, merge, relationships, birthdays/ICS); light +
+    dark/teal screenshots captured from a **seeded throwaway demo** (Radicale + 28 contacts / 3 groups,
+    driven with Playwright); a logo header + a 1280×640 social-preview banner built from the high-res icon
+    source; theming called out early; "Cardhop" dropped from product-facing copy (README, `pyproject`,
+    Unraid template, GH description) — historical docs left as dated records.
+  - **Release contract → tag-based** (**ADR-0005 amendment**): `:edge` = tip of `main` every merge;
+    `:X.Y.Z`/`:X.Y`/`:X` + `:latest` on a `v*` tag (`:latest` = newest non-prerelease); `:sha-` every
+    build. A stable/dev branch split was considered and **rejected** (git-flow overhead unjustified for a
+    solo project). `metadata-action` gets `flavor: latest=false`; version bumped `0.1.0 → 1.0.0`;
+    `uv.lock` re-locked so CI's `--frozen` sync passes.
+  - **Go-live runbook:** repo flipped **public**; `v1.0.0` tag pushed → `docker-publish` **green**
+    (published `:1.0.0`/`:1.0`/`:1`/`:latest`/`:sha-`); GitHub Release created.
+  - **Untracked `.claude/`** (SessionStart hook + checkpoint skill) via `git rm --cached` + gitignore —
+    maintainer-only tooling with no value to the app's audience; kept on disk so local workflow still runs.
+    Kept `CLAUDE.md` tracked (it's architecture/invariants/workflow docs with real contributor value).
+- **Verified:** `uv run pytest -q` → **258 passed, 44 deselected** (green after each config change);
+  the `v1.0.0` `docker-publish` run watched to **success** (build + push steps ✓); repo visibility
+  confirmed **PUBLIC** via `gh`; final `git grep` leak sweep on the public tip **CLEAN** (no
+  hostname/LAN-IP/name). Pre-flight before the flip confirmed tree clean + synced.
+- **Open/blockers:** none in-repo. **Owed manual steps (maintainer-only, not scriptable here):** flip the
+  ghcr **package** to public (independent of repo visibility — until then an outside `docker pull` fails);
+  upload `docs/img/social-preview.png` as the repo Social preview (setting only appears once public);
+  point the LAN Watchtower at `:edge` or `:latest`. Non-urgent: bump CI actions off Node-20.
+- **Memory:** **ADR-0008** added (public-release history squash) + indexed; **ADR-0005** amended
+  (tag-based release contract) + index row/status updated; `PROJECT_STATE` header/Current-position/
+  Recently-shipped/Next-actions/Open-questions/References all refreshed; the 2-tier-spine open question
+  **resolved** (committed public spine stays); this RUN_LOG entry; new **PITFALLS** entry on
+  repo-vs-package visibility being independent toggles.
+
+---
+
 ## 2026-07-18 — #33 get_by_uid deterministic tiebreak via `/flow --auto` (first autonomous run)
 
 - **Goal:** ship #33 — `store.get_by_uid` queried `WHERE user=? AND uid=?` with no `ORDER BY`, so a
