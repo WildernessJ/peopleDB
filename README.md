@@ -1,4 +1,8 @@
-# peopleDB
+<p align="center">
+  <img src="docs/img/logo.png" alt="peopleDB" width="132">
+</p>
+
+<h1 align="center">peopleDB</h1>
 
 A fast, friendly web client for a **CardDAV** address book (e.g. [Baikal](https://sabre.io/baikal/)):
 browse, search, add, edit, and organise your contacts from any browser — phone, tablet, or desktop.
