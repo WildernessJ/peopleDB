@@ -13,11 +13,11 @@
 > `/checkpoint` — doc-drift sweep → add an ADR to [DECISIONS/](DECISIONS/) if a real decision was made →
 > update this file → prepend a RUN_LOG entry → record any new gotcha in [PITFALLS.md](PITFALLS.md).
 >
-> **This spine is destined to be PUBLIC.** `WildernessJ/peopleDB` is private today but intended to go
-> public once it's more ready, and git history is permanent — write every entry as public documentation
-> from the start: no secrets, credentials, private paths, internal hostnames/LAN IPs, personal accounts,
-> or exploitable detail on an unmitigated weakness. Refer to deploys generically ("the LAN deploy"). A
-> leaked secret must be rotated, not just edited out.
+> **This spine is PUBLIC.** `WildernessJ/peopleDB` is a public repository — every entry you write is
+> immediately world-visible, and git history is permanent. Write every entry as public documentation:
+> no secrets, credentials, private paths, internal hostnames/LAN IPs, personal accounts, or exploitable
+> detail on an unmitigated weakness. Refer to deploys generically ("the LAN deploy"). A leaked secret
+> must be rotated, not just edited out.
 
 _Last updated: 2026-07-19 (**peopleDB went PUBLIC and shipped v1.0.0.** After a full-history secret audit
 (no rotatable secret anywhere; the only leaks were home-network topology in the pre-spine

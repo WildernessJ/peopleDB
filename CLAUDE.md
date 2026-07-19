@@ -12,8 +12,9 @@ server remains canonical; peopleDB reads and writes back against it.
 
 ## Status
 
-**Working household CardDAV web client.** v1 shipped 2026-07-13; the opening issue backlog is cleared.
-Current progress and next actions live in [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) — read it first.
+**Working household CardDAV web client — public, `v1.0.0` released (2026-07-19).** v1 shipped
+2026-07-13; the opening issue backlog is cleared. Current progress and next actions live in
+[`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) — read it first.
 
 ## Architecture & invariants
 
@@ -65,10 +66,10 @@ Committed, version-controlled project memory — read at session start, updated 
 A `.claude/` SessionStart hook auto-injects git state + the top of `PROJECT_STATE.md`. Run `/checkpoint`
 at session end to keep the spine current.
 
-> **This repo is destined to go public.** It is private today but intended to be published once more
-> ready, and git history is permanent. Never commit secrets, credentials, private paths, internal
-> hostnames/LAN IPs, or personal accounts — to the spine *or* anywhere else. A leaked secret must be
-> rotated, not just edited out.
+> **This repo is public.** `WildernessJ/peopleDB` is a public repository, and git history is permanent —
+> everything committed is immediately world-visible and cannot be un-published. Never commit secrets,
+> credentials, private paths, internal hostnames/LAN IPs, or personal accounts — to the spine *or*
+> anywhere else. A leaked secret must be rotated, not just edited out.
 
 ## Conventions
 
