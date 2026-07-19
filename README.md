@@ -100,10 +100,17 @@ Never commit server URLs or credentials — pass them through the environment.
 
 ### Running with Docker
 
-Images are built and published to GitHub Container Registry on every merge to `main`
+Images are built, tested, and published to GitHub Container Registry
 (`ghcr.io/wildernessj/peopledb`) — see
 [`docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md`](docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md).
-Tags: `:latest` (tip of `main`), `:vX.Y.Z` (marked releases), `:sha-<short>` (any build, for pinning).
+Stability is expressed through tags:
+
+| Tag | Points at | For |
+|---|---|---|
+| `:latest` | the newest stable release | most users — the default if you omit a tag |
+| `:1.2.3` · `:1.2` · `:1` | a marked release, rolling | pinning at your preferred stability level |
+| `:edge` | the tip of `main`, every merge | trying the latest unreleased changes |
+| `:sha-<short>` | one specific build | exact pinning / rollback |
 
 ```sh
 docker run -d --name peopledb -p 8000:8000 \

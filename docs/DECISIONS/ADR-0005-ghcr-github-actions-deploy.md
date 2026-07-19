@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Accepted (amended 2026-07-19 — see Amendment)
 date: 2026-07-15
 deciders: WildernessJ
 phase: post-v1 (deployment)
@@ -56,6 +56,46 @@ ghcr **Packages** view after a merge confirms the pipeline ran. The Unraid templ
 (`unraid/peopledb.xml`) is the review-checklist artifact for the deploy shape — env fields, `/data`
 volume, port. Image visibility (private until the repo flips) is a manual review item at the
 public-visibility flip.
+
+## Amendment (2026-07-19) — public-release tagging contract
+
+**Trigger.** The repo (and, at the flip, the ghcr package) goes public. The original tag scheme made
+`:latest` = tip of `main` (every merge). Docker convention is that `:latest` = the newest *stable*
+release, and `docker run …/peopledb` defaults to `:latest` — so an outside user would land on
+mid-feature `main`. This is a **tagging** problem, not a branching one.
+
+**Considered and rejected: a stable/dev branch split (git-flow).** A long-lived second branch earns its
+keep only when an old release line must be patched while `main` diverges toward the next major — i.e.
+users on 1.x you must support while building 2.x. Not this project: solo maintainer, one deploy, no
+supported legacy line. The cost (backporting across branches, divergence, release-branch bookkeeping)
+buys nothing here, and it wouldn't fix the `:latest` semantics anyway. **We stay trunk-based.**
+
+**Revised decision.** Stability is expressed through **tags, not branches**:
+
+- `:edge` — tip of `main`, every merge (the old `:latest` behaviour, renamed and opt-in).
+- `:X.Y.Z`, `:X.Y`, `:X` — on a `v*` git tag, the deliberate marked release, rolling. The `v` prefix is
+  dropped from the image tag (`v1.2.0` git tag → `1.2.0` image tag) per Docker convention. `:X` is
+  emitted for `>= 1.0.0`.
+- `:latest` — moved to the **newest non-prerelease** release only (a `-` in the tag ref, e.g.
+  `v1.2.0-rc1`, is excluded).
+- `:sha-<short>` — unchanged, every build.
+
+Release flow is a one-line `git tag v1.2.0 && git push --tags` — the "stable vs dev" line is a tag, not
+a branch.
+
+**Deploy / homelab.** The LAN deploy's Watchtower target is now an explicit choice, decoupled from what
+the public pulls: `:edge` keeps riding tip-of-main (prior behaviour), or `:latest` moves only on a
+release. This supersedes the ADR title's "deploy … from `:latest`" for the new tag semantics.
+
+**Package visibility.** The original decision kept the ghcr package **private** (Unraid pulling via a
+read-only PAT) to avoid signalling readiness before the repo flip — the position Alternative B deferred
+("the image goes public when the repo does, not before"). At the public flip the package is made
+**public**, so `docker pull` needs no auth and the stored Unraid PAT is no longer required for pulls.
+
+**Confirmation.** The enforcement is the same workflow; the tag change lives entirely in the
+`docker/metadata-action` `tags:`/`flavor:` block. After the next release tag, the ghcr **Packages** view
+should show `:latest`, `:X.Y.Z`, `:X.Y`, `:X`; after a plain merge to `main`, only `:edge` and `:sha-…`
+move.
 
 ## Links
 

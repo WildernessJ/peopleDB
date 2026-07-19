@@ -1,11 +1,16 @@
 # Build, test, and publish the peopleDB container image to GitHub Container
-# Registry (ghcr.io). See docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md.
+# Registry (ghcr.io). See docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md
+# (incl. the 2026-07-19 amendment: public-release tagging contract).
 #
-#   :latest        -> pushed on the default branch (main) only
-#   :vX.Y.Z        -> pushed on a v* git tag (a deliberate marked release)
-#   :sha-<short>   -> every build, for pinning / rollback
+# Trunk-based: one branch (main). Stability is expressed through TAGS, not branches.
 #
-# A red unit suite blocks the publish, so a :latest push implies green tests.
+#   :edge              -> tip of main, every merge (bleeding edge; opt in explicitly)
+#   :X.Y.Z :X.Y :X     -> on a v* git tag — the deliberate marked release, rolling
+#   :latest            -> moved to the newest NON-prerelease v* release
+#   :sha-<short>       -> every build, for pinning / rollback
+#
+# So the public default (`:latest`) only moves on a release; strangers never land
+# on mid-feature main. A red unit suite blocks any publish.
 name: docker-publish
 
 on:
@@ -56,10 +61,24 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # We control `latest` by hand (below), so keep the action from
+          # auto-attaching it to semver builds.
+          flavor: |
+            latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags (on a v* git tag): 1.2.3, 1.2, 1. Drop the `v` per
+            # Docker convention. (First public release is v1.0.0, so `{{major}}`
+            # is always >= 1 — no low-value `:0` rolling tag.)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # `latest` = newest STABLE release only: a v* tag with no prerelease
+            # suffix (a `-` in the ref, e.g. v1.2.0-rc1, is excluded).
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+            # `edge` = tip of the default branch, every merge.
+            type=raw,value=edge,enable={{is_default_branch}}
+            # Immutable per-build handle for pinning / rollback.
             type=sha,prefix=sha-
-            type=semver,pattern=v{{version}}
 
       - name: Build and push (linux/amd64)
         uses: docker/build-push-action@v6
