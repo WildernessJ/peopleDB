@@ -1,7 +1,7 @@
 [project]
 name = "peopledb"
 version = "0.1.0"
-description = "Cardhop-style web client for a CardDAV server (Baikal)"
+description = "Web client for a CardDAV address book (Baikal)"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

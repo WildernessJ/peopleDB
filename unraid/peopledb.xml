@@ -38,7 +38,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/WildernessJ/peopleDB/issues</Support>
   <Project>https://github.com/WildernessJ/peopleDB</Project>
-  <Overview>A Cardhop-style web client for a CardDAV contacts server. Sign in with your CardDAV account; the server stays canonical while peopleDB keeps a disposable local cache in /data for speed.</Overview>
+  <Overview>A web client for a CardDAV address book. Sign in with your CardDAV account; the server stays canonical while peopleDB keeps a disposable local cache in /data for speed.</Overview>
   <Category>Productivity: Other:</Category>
   <WebUI>http://[IP]:[PORT:8000]/</WebUI>
   <TemplateURL/>

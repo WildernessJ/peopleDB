@@ -1,27 +1,61 @@
 # peopleDB
 
-A Cardhop-style web client for a **CardDAV** contacts server (e.g. [Baikal](https://sabre.io/baikal/)):
-browse, search, add/edit contacts, manage groups, relationships, and birthdays — from any browser.
-The CardDAV server stays canonical; peopleDB keeps a disposable local cache for speed.
+A fast, friendly web client for a **CardDAV** address book (e.g. [Baikal](https://sabre.io/baikal/)):
+browse, search, add, edit, and organise your contacts from any browser — phone, tablet, or desktop.
+Your CardDAV server stays the source of truth; peopleDB keeps a disposable local cache so everything
+feels instant.
 
-Python / FastAPI / HTMX. See `docs/DECISIONS/ADR-0001-python-fastapi-htmx.md` for the stack decision
-and `specs/2026-07-13-peopledb-v1-design.md` for the v1 design.
+Built with Python / FastAPI / HTMX — server-rendered, no JavaScript build step. It signs in with your
+existing CardDAV credentials and shows each household member exactly what the server's permissions allow.
+
+![Browsing contacts in card view](docs/img/contacts-cards.png)
 
 ## Features
 
-- **Sign in with your CardDAV account** — no separate user database; the server's ACLs decide
-  what each household member sees.
-- **Search as you type** across names, org, emails, phones, and notes (SQLite FTS5 cache).
-- **Add / edit / delete contacts** — write-through to the server with etag conflict detection;
-  concurrent edits are surfaced, never overwritten. Unrendered vCard properties (photos,
-  social profiles, anything custom) survive edits untouched.
-- **Interact**: `mailto:` / `tel:` / `sms:` / maps links on every relevant field.
-- **Groups**: Apple-style `KIND=group` member-list cards — compatible with macOS/iOS
-  Contacts and Cardhop syncing against the same server.
-- **Relationships**: Apple `X-ABRELATEDNAMES`, navigable when the related person is a contact.
-- **Birthdays**: upcoming view plus a tokened ICS feed URL to subscribe from any calendar app.
-- **Degraded mode**: if the server is unreachable, cached data stays browsable (with a
-  staleness banner); writes fail loudly and are never queued.
+- **Sign in with your CardDAV account.** No separate user database — you log in with the same
+  credentials as Apple Contacts or any other CardDAV client, and the server's permissions decide what
+  you see. Households share one server; each person sees their own address books.
+- **Browse your way.** Switch between a compact **list** and a roomier **card** view, choose which
+  fields show in each, and tune theme, accent colour, and text size — all remembered per user.
+- **Search as you type.** Instant full-text search across names, organisations, emails, phones, and
+  notes.
+- **Quick add.** Type one plain line — `Jane Rivera jane@acme.com +1 415 555 0134 bday 3 Mar #Family` —
+  and peopleDB parses out the name, email, phone, birthday, and group, then drops you on a pre-filled
+  form to review before saving. Nothing is written until you confirm.
+- **Add, edit, and delete contacts** with changes written straight back to the server. Edits are
+  etag-checked, so a simultaneous change from another device is surfaced, never silently overwritten.
+  Anything peopleDB doesn't render itself — extra fields, social profiles, custom properties — is
+  preserved untouched.
+- **Contact photos.** View avatars and upload a new photo, with a crop step before it's saved.
+- **One tap to reach people.** Emails, phone numbers, and addresses become `mailto:`, `tel:`, `sms:`,
+  and map links.
+- **Groups.** Create, rename, and delete groups and manage their members, then filter your contacts
+  down to a group. Uses the same Apple group convention as macOS/iOS Contacts, so groups stay in sync
+  both ways against the shared server.
+- **Relationships.** Record spouse, parent, child, and other relationships; when the related person is
+  also a contact, their name links straight to their card.
+- **Merge duplicates.** Find likely duplicates of a contact, preview the merged result field by field,
+  and combine them — group memberships and all — in one step.
+- **Birthdays.** See who's coming up, and subscribe to a private calendar feed URL so birthdays appear
+  in any calendar app.
+- **Works when the server doesn't.** If the CardDAV server is unreachable, your cached contacts stay
+  browsable behind a staleness banner. Writes fail loudly rather than silently queueing, so you always
+  know what actually saved.
+
+## Screenshots
+
+| List & card views | Contact detail |
+|---|---|
+| ![Contacts list view](docs/img/contacts-list.png) | ![Contact detail with phones, email, address, relationships, birthday and notes](docs/img/contact-detail.png) |
+| **Groups** | **Upcoming birthdays** |
+| ![A group and its members](docs/img/group.png) | ![Upcoming birthdays with a calendar feed URL](docs/img/birthdays.png) |
+
+## How it works
+
+Your CardDAV server is **canonical**. peopleDB reads from a local SQLite cache for speed and writes
+straight through to the server, updating the cache from the server's response. The cache is entirely
+disposable — delete it and it rebuilds on the next sync. Sessions live only in memory (your CardDAV
+credentials are encrypted and never written to disk), so there's nothing sensitive at rest.
 
 ## Running
 
@@ -32,18 +66,20 @@ PEOPLEDB_SECRET_KEY=$(uv run python -c 'from cryptography.fernet import Fernet; 
 uv run peopledb
 ```
 
+Then open `http://localhost:8000` and sign in with your CardDAV username and password.
+
 ### Environment variables
 
 | Variable | Required | Meaning |
 |---|---|---|
 | `PEOPLEDB_DAV_URL` | yes | Base URL of the CardDAV server (e.g. Baikal's `/dav.php`). |
-| `PEOPLEDB_SECRET_KEY` | no | Fernet key encrypting session credentials at rest. **Empty → an ephemeral key is generated at startup, so every restart logs all users out.** Set a fixed key to keep sessions across restarts. |
+| `PEOPLEDB_SECRET_KEY` | no | Fernet key encrypting session credentials in memory. **Empty → an ephemeral key is generated at startup, so every restart logs all users out.** Set a fixed key to keep sessions across restarts. |
 | `PEOPLEDB_DB_PATH` | no | SQLite cache path (default `peopledb-cache.db`). Safe to delete; it's a mirror. |
 | `PEOPLEDB_SYNC_INTERVAL` | no | Background refresh interval in seconds (default `300`). |
 | `PEOPLEDB_WRITE_ADDRESSBOOK` | no | Which addressbook new contacts/groups are written to, matched by displayname or path segment (default `default`). Falls back to the first discovered if no match. |
 | `PEOPLEDB_SECURE_COOKIES` | no | `0` to drop the `Secure` cookie flag for plain-HTTP localhost dev. Default (`1`) requires HTTPS. |
 
-Never commit server URLs or credentials.
+Never commit server URLs or credentials — pass them through the environment.
 
 ### Running with Docker
 
@@ -51,8 +87,6 @@ Images are built and published to GitHub Container Registry on every merge to `m
 (`ghcr.io/wildernessj/peopledb`) — see
 [`docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md`](docs/DECISIONS/ADR-0005-ghcr-github-actions-deploy.md).
 Tags: `:latest` (tip of `main`), `:vX.Y.Z` (marked releases), `:sha-<short>` (any build, for pinning).
-The package is **private**, so pull requires a one-time login with a read-only token
-(`docker login ghcr.io -u <github-user> -p <PAT with read:packages>`).
 
 ```sh
 docker run -d --name peopledb -p 8000:8000 \
@@ -78,10 +112,9 @@ See the env-var table above for the rest.
 #### Unraid
 
 `unraid/peopledb.xml` is a Docker-tab template — add it via **Add Container** (or drop it in
-`/boot/config/plugins/dockerMan/templates-user/`), `docker login ghcr.io` once so the host can pull
-the private image, fill `PEOPLEDB_DAV_URL` and a fixed `PEOPLEDB_SECRET_KEY`, and start. A new
-`:latest` then shows "update ready" in the Docker tab; roll back by pointing the repository at a
-`:sha-…` or `:vX.Y.Z` tag.
+`/boot/config/plugins/dockerMan/templates-user/`), fill `PEOPLEDB_DAV_URL` and a fixed
+`PEOPLEDB_SECRET_KEY`, and start. A new `:latest` then shows "update ready" in the Docker tab; roll back
+by pointing the repository at a `:sha-…` or `:vX.Y.Z` tag.
 
 Two things that bite on a fresh Unraid deploy:
 
@@ -102,3 +135,11 @@ Two things that bite on a fresh Unraid deploy:
 uv run pytest            # unit tests
 uv run pytest -m live    # end-to-end tests against a throwaway local Radicale
 ```
+
+The design and the reasoning behind the non-obvious calls live in
+[`docs/`](docs/) — start with [`docs/DECISIONS/`](docs/DECISIONS/) (architecture decision records) and
+[`docs/PITFALLS.md`](docs/PITFALLS.md).
+
+## License
+
+[MIT](LICENSE).
