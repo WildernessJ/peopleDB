@@ -27,3 +27,6 @@ dist/
 *.sqlite3
 peopledb-cache.db-shm
 peopledb-cache.db-wal
+
+# Local Claude Code workflow tooling (hooks, checkpoint skill) — maintainer-only
+.claude/
