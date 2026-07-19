@@ -12,7 +12,14 @@ feels instant.
 Built with Python / FastAPI / HTMX — server-rendered, no JavaScript build step. It signs in with your
 existing CardDAV credentials and shows each household member exactly what the server's permissions allow.
 
-![Browsing contacts in card view](docs/img/contacts-cards.png)
+**Make it yours.** Light or dark theme and a choice of ten accent colours, plus list/card layout and
+text size — all set per person and remembered. Here it is in card view (light) and dark mode with a
+teal accent:
+
+<p align="center">
+  <img src="docs/img/contacts-cards.png" alt="Browsing contacts in card view (light theme)" width="49%">
+  <img src="docs/img/dark-appearance.png" alt="Dark theme with a teal accent and the colour picker open" width="49%">
+</p>
 
 ## Features
 
@@ -48,11 +55,17 @@ existing CardDAV credentials and shows each household member exactly what the se
 
 ## Screenshots
 
-| List & card views | Contact detail |
+| List view | Contact detail |
 |---|---|
 | ![Contacts list view](docs/img/contacts-list.png) | ![Contact detail with phones, email, address, relationships, birthday and notes](docs/img/contact-detail.png) |
 | **Groups** | **Upcoming birthdays** |
 | ![A group and its members](docs/img/group.png) | ![Upcoming birthdays with a calendar feed URL](docs/img/birthdays.png) |
+
+### In dark mode, with a teal accent
+
+| Quick add — one line, parsed | Merge duplicates |
+|---|---|
+| ![The quick-add line parsed into a pre-filled new-contact form](docs/img/dark-quickadd.png) | ![Merging two duplicate contacts field by field](docs/img/dark-merge.png) |
 
 ## How it works
 
