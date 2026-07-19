@@ -86,6 +86,8 @@ a branch.
 **Deploy / homelab.** The LAN deploy's Watchtower target is now an explicit choice, decoupled from what
 the public pulls: `:edge` keeps riding tip-of-main (prior behaviour), or `:latest` moves only on a
 release. This supersedes the ADR title's "deploy … from `:latest`" for the new tag semantics.
+**Resolved (2026-07-19):** the LAN deploy tracks **`:edge`** — the user-instance Unraid template and the
+live container were switched off `:latest`; the public repo template stays `:latest`.
 
 **Package visibility.** The original decision kept the ghcr package **private** (Unraid pulling via a
 read-only PAT) to avoid signalling readiness before the repo flip — the position Alternative B deferred

@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-07-19 — LAN deploy switched to `:edge` (Watchtower target resolved)
+
+- **Goal:** resolve the one open post-launch item — point the LAN deploy at a tag now that the release
+  contract split `:edge` (tip of `main`) from `:latest` (releases only). Keep the pre-amendment
+  behaviour of riding `main`.
+- **Did:** switched the running Unraid container and its user-instance template (`my-peopledb.xml` on the
+  flash) from `ghcr.io/wildernessj/peopledb:latest` to `:edge`. Pulled `:edge` first (abort-safe), edited
+  the template, recreated the container carrying over its custom bridge network, published port, `/data`
+  volume, all four env vars, `unless-stopped`, and the Unraid `net.unraid.docker.*` labels (stays
+  Docker-tab managed). The **public** repo template (`unraid/peopledb.xml`) was left on `:latest`
+  deliberately — outside users should land on stable releases, not tip-of-`main`.
+- **Verified:** `docker ps` shows `…/peopledb:edge` Up; clean Uvicorn startup in logs; `curl` to the host
+  port returns **HTTP 303** (expected unauthenticated redirect to login). `:edge` manifest confirmed
+  present on ghcr before the switch.
+- **Open/blockers:** none. Public launch is now fully complete — nothing owed.
+- **Memory:** PROJECT_STATE header/Deployment/Next-actions updated (Watchtower target → resolved: `:edge`);
+  ADR-0005 amendment annotated with the resolution; this RUN_LOG entry. No new ADR (deploy choice under an
+  already-recorded decision), no new PITFALLS.
+
+---
+
+## 2026-07-19 — post-launch: ghcr package public, social preview, registry cleanup (owed steps closed)
+
+- **Goal:** close the three maintainer-only steps the launch left owed, and verify the image is actually
+  pullable by an outside user.
+- **Did:** flipped the ghcr **package** to public (web UI — no `gh`/REST path for package visibility);
+  uploaded `docs/img/social-preview.png` as the repo Social preview; deleted the pre-squash `sha-…` image
+  versions from the registry (kept the release-tagged versions). Confirmed the pre-redaction images were
+  never a leak — `.dockerignore` excludes `docs/`, so the topology-leaking handoffs were never in any
+  image layer.
+- **Verified:** anonymous (no-auth) registry check from a clean shell — fetched an anon pull token and got
+  HTTP **200** on the manifests for `:latest`, `:1.0.0`, `:1.0`, `:1`, `:edge`; post-cleanup tag list is
+  down to those + three current-commit `sha-…` handles (release tags intact). A stranger can
+  `docker pull ghcr.io/wildernessj/peopledb`.
+- **Open/blockers:** none. Only optional item left: the LAN Watchtower target (`:edge` vs `:latest`).
+- **Memory:** PROJECT_STATE header/Deployment/Next-actions updated (owed steps → done; launch fully
+  complete); this RUN_LOG entry. No ADR, no new PITFALLS (the repo-vs-package-visibility trap was recorded
+  in the prior entry).
+
+---
+
 ## 2026-07-19 — public launch: repo → public, v1.0.0 released, README/branding, tag-based releases
 
 - **Goal:** take peopleDB from private to public cleanly — no leaked secrets in permanent history, a

@@ -31,11 +31,13 @@ only) over a stable/dev branch split (rejected — git-flow overhead unjustified
 tag `v1.0.0` pushed → `docker-publish` **green** (published `:1.0.0`/`:1.0`/`:1`/`:latest`/`:sha-`),
 GitHub Release created. Untracked `.claude/` (maintainer-only tooling; kept on disk). Closed **#34**
 won't-fix (the `get_by_uid` `is_group` residual — the deterministic href tiebreak is sufficient and a
-`UNIQUE(user, uid)` constraint would break the cache-mirrors-server invariant per ADR-0002). **Owed
-(manual, maintainer-only):** make the ghcr **package** public (an independent toggle from repo
-visibility — until done, an outside `docker pull` fails), upload `docs/img/social-preview.png` as the
-repo Social preview (the setting only appears once the repo is public), and point the LAN deploy's
-Watchtower at `:edge` or `:latest`. **Open issues: none.** **Prior:** 2026-07-18 (**#33** shipped via autonomous `/flow --auto` — the first `--auto` run on this
+`UNIQUE(user, uid)` constraint would break the cache-mirrors-server invariant per ADR-0002).
+**Post-launch (done):** the ghcr **package** was flipped public (verified — an anonymous `docker pull`
+of `:latest`/`:1.0.0`/`:1.0`/`:1`/`:edge` all return 200), the Social preview image uploaded, and the
+old pre-squash `sha-…` image versions cleaned out of the registry (release tags intact; the
+pre-redaction images never carried the topology leak — `.dockerignore` excludes `docs/`). The **LAN
+deploy** now tracks **`:edge`** (chosen 2026-07-19 — rides tip-of-`main`, the pre-amendment behaviour;
+user-instance template + live container both switched). **Nothing owed. Open issues: none.** **Prior:** 2026-07-18 (**#33** shipped via autonomous `/flow --auto` — the first `--auto` run on this
 repo: deterministic `ORDER BY href LIMIT 1` tiebreak in `store.get_by_uid` (`8e63eaa`, merged `31bbc9a`).
 The query had no `ORDER BY`, so a duplicate `(user, uid)` collision returned an arbitrary row; scope held
 to the deterministic tiebreak (issue option 1), UNIQUE-invariant enforcement left out. Machine-verified
@@ -81,9 +83,9 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
   **tag-based contract** (ADR-0005 + 2026-07-19 amendment): `:edge` on every push to `main`;
   `:X.Y.Z`/`:X.Y`/`:X` + `:latest` on a `v*` release tag (`:latest` = newest non-prerelease only);
   `:sha-<short>` every build. The LAN deploy runs from the Unraid Docker-tab template
-  (`unraid/peopledb.xml`) behind a reverse proxy; its Watchtower target (`:edge` vs `:latest`) is a
-  post-launch choice. **Owed:** the ghcr *package* must be flipped public (independent of repo
-  visibility) before an outside `docker pull` works. See ADR-0005; deploy gotchas in PITFALLS.
+  (`unraid/peopledb.xml`) behind a reverse proxy; its Watchtower target tracks **`:edge`** (chosen
+  2026-07-19). The ghcr **package is public** (verified via anonymous pull); a stranger can
+  `docker pull ghcr.io/wildernessj/peopledb`. See ADR-0005; deploy gotchas in PITFALLS.
 - **Active gate:** none. Per Coding Workflow v2 — one `/code-review` on the full diff before merge.
 - **Branch:** `main` is the working line; new work starts from `main`.
 - **Verification:** **258 unit tests green + 44 live tests** (`uv run pytest`; `-m live` boots a
@@ -114,8 +116,9 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
   considered and rejected (**ADR-0005 amendment**); version bumped `0.1.0 → 1.0.0`. Go-live runbook
   executed: repo → **public**, `v1.0.0` tag pushed → `docker-publish` green (published
   `:1.0.0`/`:1.0`/`:1`/`:latest`/`:sha-`), GitHub Release created. `.claude/` untracked (maintainer
-  tooling, kept local). **#34 closed won't-fix.** Owed manual steps: ghcr package → public, social-preview
-  upload, Watchtower target — see the header and PITFALLS.
+  tooling, kept local). **#34 closed won't-fix.** Post-launch, the owed manual steps were closed: ghcr
+  package flipped **public** (anonymous pull verified), Social preview uploaded, old `sha-…` image
+  versions cleaned from the registry — only the optional Watchtower target remains.
 - **#31 merge/search group-primary guard + field-box refactor** (2026-07-18, live `/flow`) — two
   bundled changes. **#31:** `GET /contacts/{uid}/merge/search` excluded groups from the *candidate*
   list but never validated the *primary* `uid` in the path, so `…/{group_uid}/merge/search` returned
@@ -280,18 +283,15 @@ PITFALLS entry here is annotated with that mitigation. **Open enhancements: #33 
 
 ## Next actions
 
-- **Everything committed is pushed; `main` in sync with origin.** Repo is public, `v1.0.0` released,
-  `docker-publish` green. **No open GitHub issues.**
-- **Owed manual steps (maintainer-only, can't be scripted from here):**
-  - **Make the ghcr *package* public** — repo visibility and package visibility are independent toggles;
-    until this is flipped, an outside `docker pull ghcr.io/wildernessj/peopledb` fails (needs auth), so
-    the README's Docker instructions don't work for others. Package settings → Change visibility → Public.
-  - **Upload the Social preview** — Settings → General → Social preview → upload
-    `docs/img/social-preview.png` (the setting only appears now that the repo is public).
-  - **Point the LAN deploy's Watchtower** at `:edge` (ride `main`, prior behaviour) or `:latest`
-    (releases only) — see the ADR-0005 amendment.
-  - **CI housekeeping (non-urgent):** `docker-publish` logs Node-20 deprecation warnings for the pinned
-    actions (`checkout@v4`, `setup-uv@v5`, the `docker/*` ones); bump to their newer majors when convenient.
+- **Everything committed is pushed; `main` in sync with origin.** Repo public, `v1.0.0` released,
+  package public and anonymously pullable, Social preview set, registry tidied. **No open GitHub issues.**
+  The public launch is fully complete.
+- **LAN Watchtower target — resolved (2026-07-19):** set to `:edge`, riding tip-of-`main` (the
+  pre-amendment behaviour). The user-instance Unraid template (`my-peopledb.xml`) and the live container
+  were both switched off `:latest`; the public repo template (`unraid/peopledb.xml`) stays `:latest`.
+  See the ADR-0005 amendment / the 2026-07-19 RUN_LOG entry. **Public launch fully complete.**
+- **CI housekeeping (non-urgent):** `docker-publish` logs Node-20 deprecation warnings for the pinned
+  actions (`checkout@v4`, `setup-uv@v5`, the `docker/*` ones); bump to their newer majors when convenient.
 - **Accepted residual from #32 (audit-noted, not filed):** `detail.html`'s box-guard duplicates the
   seven-field list implicit in the `<dl>` body; a future field row added inside the box without updating
   the guard would wrongly suppress the box for a contact that has only that field.
