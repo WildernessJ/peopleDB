@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}peopleDB{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/peopledb-icon.png">
+  <script src="/static/htmx.min.js"></script>
+  <script>
+    (function () {
+      // Runs before first paint to avoid a flash of the wrong theme. Static
+      // script, no user data interpolated — safe per PITFALLS.md.
+      var stored = null;
+      try { stored = localStorage.getItem('peopledb-theme'); } catch (e) {}
+      var mql = window.matchMedia('(prefers-color-scheme: dark)');
+      var effective = (stored === 'dark' || stored === 'light') ? stored : (mql.matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', effective);
+
+      // Accent color (issue #13): apply the stored preset before paint. Only a
+      // known key is ever written to the DOM attribute — no arbitrary value is
+      // interpolated, so no CSS-injection surface. Red is the default (no attr).
+      var ACCENTS = { red:1, orange:1, green:1, teal:1, blue:1, purple:1, pink:1,
+                      amber:1, lime:1, indigo:1, magenta:1, brown:1, slate:1 };
+      var accent = null;
+      try { accent = localStorage.getItem('peopledb-accent'); } catch (e) {}
+      if (accent && ACCENTS[accent] && accent !== 'red') {
+        document.documentElement.setAttribute('data-accent', accent);
+      }
+
+      // Display settings (issue #display-settings): six independent S/M/L
+      // size knobs, applied before paint for the same no-flash reason as
+      // theme/accent above. Same allow-list guard, so only sm/md/lg ever
+      // reach the DOM. md is the existing default appearance and writes no
+      // attribute — untouched installs render byte-for-byte unchanged.
+      // peopledb-avatar-size is the pre-existing detail-avatar toggle key,
+      // reused here so prior choices carry over into the new control.
+      var SIZES = { sm: 1, md: 1, lg: 1 };
+      var SIZE_KEYS = [
+        ['peopledb-size-topbar', 'data-size-topbar'],
+        ['peopledb-size-list', 'data-size-list'],
+        ['peopledb-size-card-text', 'data-size-card-text'],
+        ['peopledb-size-card-avatar', 'data-size-card-avatar'],
+        ['peopledb-avatar-size', 'data-size-detail-avatar'],
+        ['peopledb-size-detail-text', 'data-size-detail-text']
+      ];
+      SIZE_KEYS.forEach(function (pair) {
+        var key = pair[0], attr = pair[1];
+        var val = null;
+        try { val = localStorage.getItem(key); } catch (e) {}
+        if (val && SIZES[val] && val !== 'md') {
+          document.documentElement.setAttribute(attr, val);
+        }
+      });
+
+      // Field selection (issue #27): which fields render in list/card views.
+      // Unlike the size knobs above, the attribute is ALWAYS present -- when
+      // the key is absent we write the current-behavior default so untouched
+      // installs render exactly as before this feature shipped. Same
+      // allow-list guard as everywhere else: only known tokens ever reach the
+      // DOM (or get written back to localStorage), so there's no
+      // CSS-injection surface via a crafted stored value.
+      // Adding a field? This allow-list is duplicated in the fields-group
+      // handler near the bottom of <body> (separate script scope, can't share
+      // a var) AND drives nothing on its own -- you must also add the token's
+      // template span (_contacts.html), CSS hide+reveal rules, and popover
+      // checkbox. Miss THIS copy specifically and the pre-paint sanitizer
+      // strips the new token on every reload -> the setting silently reverts.
+      var FIELDS = { org: 1, phone: 1, email: 1, bday: 1, url: 1, address: 1 };
+      var FIELD_KEYS = [
+        ['peopledb-list-fields', 'data-list-fields', 'org'],
+        ['peopledb-card-fields', 'data-card-fields', 'org phone email']
+      ];
+      function sanitizeFields(raw) {
+        return raw.split(/\s+/).filter(function (t) { return FIELDS[t]; }).join(' ');
+      }
+      FIELD_KEYS.forEach(function (triple) {
+        var key = triple[0], attr = triple[1], fallback = triple[2];
+        var val = null;
+        try { val = localStorage.getItem(key); } catch (e) {}
+        // Distinguish "unset" (null -> use the current-behavior default) from
+        // an explicit empty selection ('' -> keep it: show only name+avatar).
+        // Using `val || fallback` would silently revert a deliberate
+        // uncheck-all on the next load.
+        var sanitized = (val === null) ? fallback : sanitizeFields(val);
+        document.documentElement.setAttribute(attr, sanitized);
+      });
+
+      // Follow OS changes live. Re-read storage inside the callback: a toggle
+      // click after page load sets an explicit override this listener must not
+      // clobber on the next OS theme change.
+      if (mql.addEventListener) {
+        mql.addEventListener('change', function (e) {
+          var current = null;
+          try { current = localStorage.getItem('peopledb-theme'); } catch (err) {}
+          if (current !== 'dark' && current !== 'light') {
+            document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+          }
+        });
+      }
+    })();
+  </script>
+  <style>
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+               overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    :root {
+      color-scheme: light;
+      --accent: #c23a31; --muted: #777; --line: #e4e4e4; --bg: #fafafa;
+      --fg: #1c1c1c; --surface: #fff; --accent-fg: #fff;
+      --banner-error-bg: #fdecea; --banner-error-border: #f5c6c0; --banner-error-fg: #1c1c1c;
+      --banner-warn-bg: #fff8e1; --banner-warn-border: #f0e0a0; --banner-warn-fg: #1c1c1c;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --accent: #ff6b61; --muted: #999; --line: #333; --bg: #16171a;
+      --fg: #e8e8e8; --surface: #232427; --accent-fg: #1c1c1c;
+      --banner-error-bg: #3a1f1d; --banner-error-border: #6e332c; --banner-error-fg: #ffd7d2;
+      --banner-warn-bg: #3a3320; --banner-warn-border: #6e5f30; --banner-warn-fg: #f5e6b8;
+    }
+    /* User-selectable accent (issue #13). Each preset is a {light, dark} pair,
+       all AA-validated on both themes (see tests/test_accent_contrast.py). Red is
+       the default and lives in the base :root rules above. The [data-theme]
+       variants are more specific than the base dark rule, so they win in dark
+       mode regardless of source order. */
+    :root[data-accent="orange"] { --accent: #a85a00; }
+    :root[data-accent="orange"][data-theme="dark"] { --accent: #ffab5e; }
+    :root[data-accent="green"]  { --accent: #1f7a3d; }
+    :root[data-accent="green"][data-theme="dark"]  { --accent: #5fd07f; }
+    :root[data-accent="teal"]   { --accent: #0f7a83; }
+    :root[data-accent="teal"][data-theme="dark"]   { --accent: #4fd2dd; }
+    :root[data-accent="blue"]   { --accent: #1666cf; }
+    :root[data-accent="blue"][data-theme="dark"]   { --accent: #6cb0ff; }
+    :root[data-accent="purple"] { --accent: #7a3fd0; }
+    :root[data-accent="purple"][data-theme="dark"] { --accent: #c39bf5; }
+    :root[data-accent="pink"]   { --accent: #c02b6f; }
+    :root[data-accent="pink"][data-theme="dark"]   { --accent: #ff86bc; }
+    :root[data-accent="amber"]  { --accent: #8a6a00; }
+    :root[data-accent="amber"][data-theme="dark"]  { --accent: #f0c04a; }
+    :root[data-accent="lime"]   { --accent: #4a7a12; }
+    :root[data-accent="lime"][data-theme="dark"]   { --accent: #a6d95f; }
+    :root[data-accent="indigo"] { --accent: #4048c9; }
+    :root[data-accent="indigo"][data-theme="dark"] { --accent: #98a2ff; }
+    :root[data-accent="magenta"]{ --accent: #a92c8f; }
+    :root[data-accent="magenta"][data-theme="dark"]{ --accent: #f184d6; }
+    :root[data-accent="brown"]  { --accent: #7a4a28; }
+    :root[data-accent="brown"][data-theme="dark"]  { --accent: #cf9f78; }
+    :root[data-accent="slate"]  { --accent: #586273; }
+    :root[data-accent="slate"][data-theme="dark"]  { --accent: #a7b2c6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           background: var(--bg); color: var(--fg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    /* Shared top bar (issue #26): three-column grid — brand left, search/quick-add
+       centered, controls (accent/theme/gear/Sign out) right. Sticky so the controls
+       stay reachable on scroll (they used to be position:fixed). The old
+       padding-right hack that dodged the fixed cluster is gone — the controls are
+       in-flow now. Markup lives in _topbar.html; login.html omits it. */
+    header.topbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+             gap: 1rem; padding: .6rem 1rem; position: sticky; top: 0; z-index: 50;
+             background: var(--surface); border-bottom: 1px solid var(--line); }
+    .brand { display: inline-flex; align-items: center; gap: .5rem; font-size: 1.05rem;
+             font-weight: 700; color: var(--fg); white-space: nowrap; }
+    .brand:hover { text-decoration: none; }
+    .brand-icon { width: 1.7rem; height: 1.7rem; border-radius: 6px; }
+    .topbar-center { display: flex; align-items: center; justify-content: center;
+             gap: .5rem; flex-wrap: wrap; min-width: 0; }
+    .topbar-center .quick-add { display: flex; gap: .4rem; }
+    .topbar-controls { display: flex; align-items: center; gap: .5rem; }
+    /* Slightly stronger outline so search + quick-add read as distinct inputs
+       (issue #26): a heavier, higher-contrast border than the default --line. */
+    .topbar-center .search,
+    .topbar-center .quick-add input { border-width: 1.5px; border-color: var(--muted); }
+    /* Narrow viewports: the three-column bar can't hold brand + a centered
+       search + four controls on one line without the center overflowing.
+       Collapse to two rows — brand and the control cluster share the top line;
+       search + quick-add take a full-width row beneath. */
+    @media (max-width: 720px) {
+      header.topbar { display: flex; flex-wrap: wrap; align-items: center; }
+      .brand { order: 1; }
+      .topbar-controls { order: 2; margin-left: auto; }
+      .topbar-center { order: 3; flex-basis: 100%; justify-content: flex-start; }
+      .topbar-center .search { flex: 1; }
+    }
+    main { max-width: 720px; margin: 1.2rem auto; padding: 0 1rem; }
+    /* Index (list + card grid) goes wider than the 720px default so the
+       elastic card grid (auto-fill minmax) yields ~7 columns; form, detail,
+       groups, and birthdays keep the narrow default for readability. */
+    main.contact-index { max-width: 1400px; }
+    input, textarea, select, button {
+      font: inherit; padding: .4rem .55rem; border: 1px solid var(--line);
+      border-radius: 6px; background: var(--surface); color: var(--fg); }
+    button { cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+    button.danger { color: var(--accent); }
+    .search { flex: 1; max-width: 26rem; }
+    ul.contacts { list-style: none; margin: 0; padding: 0; background: var(--surface);
+                  border: 1px solid var(--line); border-radius: 8px; }
+    ul.contacts li { padding: .55rem .9rem; border-bottom: 1px solid var(--line); }
+    ul.contacts li:last-child { border-bottom: none; }
+    /* em, not rem: so the list-view size control (below) can scale this
+       alongside the row text it's attached to via one container font-size. */
+    ul.contacts .org, ul.contacts .detail { color: var(--muted); font-size: .85em; margin-left: .5rem; }
+    ul.contact-cards { list-style: none; margin: 0; padding: 0; display: grid;
+                       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
+    .contact-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+                    padding: .8rem; text-align: center; }
+    /* em, not rem: scales with .contact-card's own font-size (card-text
+       size control below) instead of staying fixed. */
+    /* overflow-wrap: anywhere so an unbreakable token (long email/url, or a
+       display name with no spaces) breaks rather than spilling past the card
+       border; it only breaks when there's no normal opportunity, and lets the
+       grid track shrink to the cell width. */
+    .contact-card .org, .contact-card .detail { display: block; color: var(--muted);
+                                                 font-size: .82em; margin-top: .25rem;
+                                                 overflow-wrap: anywhere; }
+    .contact-card a { display: block; font-weight: 600; margin-top: .3rem;
+                      overflow-wrap: anywhere; }
+    .contact-card .avatar, .contact-card .avatar.initials { margin-left: auto; margin-right: auto; }
+    .muted { color: var(--muted); }
+    .avatar, .avatar-sm { border-radius: 50%; object-fit: cover; }
+    .avatar { display: block; width: 4rem; height: 4rem; margin-bottom: .6rem; }
+    .avatar-sm { display: inline-block; width: 1.7rem; height: 1.7rem;
+                 vertical-align: middle; margin-right: .5rem; }
+    .avatar.initials, .avatar-sm.initials { align-items: center; justify-content: center;
+                                             background: var(--accent); color: var(--accent-fg);
+                                             font-weight: 600; }
+    .avatar.initials { display: flex; font-size: 1.3rem; }
+    .avatar-sm.initials { display: inline-flex; font-size: .65rem; }
+    .banner { padding: .6rem .9rem; border-radius: 8px; margin-bottom: 1rem; }
+    .banner.error { background: var(--banner-error-bg); border: 1px solid var(--banner-error-border);
+                    color: var(--banner-error-fg); }
+    .banner.warn { background: var(--banner-warn-bg); border: 1px solid var(--banner-warn-border);
+                   color: var(--banner-warn-fg); }
+    /* Links inside banners inherit the banner's own high-contrast foreground
+       instead of --accent: the accent is tuned for AA on page/surface/avatar
+       backgrounds, not the banner tints, so an accent link here could fall below
+       AA (issue found in session audit). This decouples banner-link contrast
+       from the accent entirely — see tests/test_accent_contrast.py note. */
+    .banner a { color: inherit; text-decoration: underline; }
+    dl.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
+    /* em so detail field labels (CELL, HOME, birthday…) scale with the
+       detail-text size control alongside their values, not stay fixed. */
+    dl.card dt { color: var(--muted); font-size: .78em; text-transform: uppercase;
+                 letter-spacing: .04em; margin-top: .7rem; }
+    dl.card dt:first-child { margin-top: 0; }
+    dl.card dd { margin: .15rem 0 0 0; }
+    .actions { margin-top: 1rem; display: flex; gap: .6rem; }
+    .fieldrow { display: flex; gap: .5rem; margin-bottom: .4rem; }
+    .fieldrow input.label { width: 8rem; }
+    .fieldrow input.value { flex: 1; }
+    form.editor label.single { display: block; margin: .7rem 0 .2rem; color: var(--muted);
+                               font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+    fieldset { border: none; padding: 0; margin: 1rem 0 0; }
+    legend { color: var(--muted); font-size: .8rem; text-transform: uppercase;
+             letter-spacing: .04em; padding: 0; }
+    /* Photo preview + crop (issues #14, #17). */
+    #photo-preview-wrap .avatar,
+    #photo-preview-wrap .avatar.initials { margin: 0 .8rem 0 0; }
+    #photo-crop-stage { margin-top: .6rem; }
+    #photo-crop-canvas-wrap { position: relative; display: inline-block; max-width: 100%; }
+    #photo-crop-source { display: block; max-width: 100%; max-height: 60vh; user-select: none; }
+    #photo-crop-canvas { position: absolute; top: 0; left: 0; touch-action: none; cursor: move; }
+    .photo-crop-hint { margin: .35rem 0 0; font-size: .78rem; }
+    #theme-toggle { flex: none; width: 2.1rem; height: 2.1rem; padding: 0; line-height: 1;
+                    border-radius: 50%; font-size: 1rem; }
+    /* Accent picker (issue #13): a popover anchored under its in-flow summary. */
+    #accent-picker { position: relative; }
+    #accent-picker > summary { list-style: none; width: 2.1rem; height: 2.1rem;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid var(--line); border-radius: 50%;
+                    background: var(--surface); cursor: pointer; font-size: 1rem; }
+    #accent-picker > summary::-webkit-details-marker { display: none; }
+    #accent-picker[open] > summary { border-color: var(--accent); }
+    .swatches { position: absolute; top: 2.5rem; right: 0;
+                display: flex; flex-wrap: wrap; gap: .4rem;
+                width: 13.5rem; max-width: calc(100vw - 4.5rem);
+                padding: .5rem .55rem; background: var(--surface);
+                border: 1px solid var(--line); border-radius: 10px;
+                box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+    .swatches button { width: 1.4rem; height: 1.4rem; padding: 0; border-radius: 50%;
+                       border: 2px solid transparent; background: var(--sw); cursor: pointer; }
+    .swatches button[aria-pressed="true"] { border-color: var(--fg); }
+    /* Settings popover (display-settings): in-flow control in the topbar
+       controls group. Same circle-button + absolute-panel idiom, now anchored
+       to its own summary rather than the viewport. */
+    /* The gear is intentionally larger than the theme/accent icons — it's the
+       entry point to all display sizing, so it reads as the primary control.
+       flex align-items:center on .topbar-controls keeps it vertically centred
+       against its 2.1rem siblings, so no manual top offset is needed. */
+    #settings-panel { position: relative; }
+    #settings-panel > summary { list-style: none; width: 2.8rem; height: 2.8rem;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid var(--line); border-radius: 50%;
+                    background: var(--surface); cursor: pointer; font-size: 1.4rem; }
+    #settings-panel > summary::-webkit-details-marker { display: none; }
+    #settings-panel[open] > summary { border-color: var(--accent); }
+    /* top clears the enlarged gear (2.8rem tall at md) so the panel drops
+       below it rather than over its lower arc; the lg override below clears
+       the 3.4rem gear. max-width subtracts the panel's own right offset
+       (up to 6.8rem) so the panel never runs off the left edge on a narrow
+       viewport. */
+    .settings-popover { position: absolute; top: 3.1rem; right: 0;
+                display: flex; flex-direction: column; gap: .55rem;
+                width: 15rem; max-width: calc(100vw - 7rem);
+                padding: .6rem .65rem; background: var(--surface);
+                border: 1px solid var(--line); border-radius: 10px;
+                box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+    .size-group { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+    .size-group .size-label { font-size: .82rem; color: var(--muted); }
+    /* Field selection groups (issue #27): same label style as the size
+       groups, but the control is a wrapping row of checkboxes rather than a
+       segmented S/M/L toggle -- six labelled boxes don't fit one line at the
+       popover's width. */
+    .fields-group { display: flex; flex-direction: column; gap: .3rem; }
+    .fields-toggle { display: flex; flex-wrap: wrap; gap: .1rem .6rem; }
+    .fields-toggle label { display: flex; align-items: center; gap: .25rem;
+                            font-size: .78rem; color: var(--fg); }
+    /* Segmented S/M/L control: same visual as the old detail-avatar-only
+       #avatar-size-toggle, now shared by all six size groups via class. */
+    .size-toggle { display: inline-flex; gap: .3rem; }
+    .size-toggle button { width: 1.9rem; height: 1.9rem; padding: 0;
+                           font-size: .78rem; border-radius: 50%; }
+    .size-toggle button[aria-pressed="true"] { background: var(--accent);
+                                                border-color: var(--accent);
+                                                color: var(--accent-fg); }
+    /* Top-bar size control: scales the brand, its icon, the header inputs, and
+       the three control icons together. Now that the controls are in-flow (flex,
+       gap), the old per-icon `right`/`top` offset juggling and the header
+       padding-right are gone — the flex layout reflows on its own. md (no
+       attribute) is the sizing already defined above. */
+    :root[data-size-topbar="sm"] .brand { font-size: .82rem; }
+    :root[data-size-topbar="sm"] .brand-icon { width: 1.4rem; height: 1.4rem; }
+    :root[data-size-topbar="sm"] header input,
+    :root[data-size-topbar="sm"] header button { font-size: .8rem; }
+    :root[data-size-topbar="sm"] #theme-toggle,
+    :root[data-size-topbar="sm"] #accent-picker > summary { width: 1.8rem; height: 1.8rem; font-size: .85rem; }
+    :root[data-size-topbar="sm"] #settings-panel > summary { width: 2.4rem; height: 2.4rem; font-size: 1.2rem; }
+    :root[data-size-topbar="lg"] .brand { font-size: 1.45rem; }
+    :root[data-size-topbar="lg"] .brand-icon { width: 2.3rem; height: 2.3rem; }
+    :root[data-size-topbar="lg"] header input,
+    :root[data-size-topbar="lg"] header button { font-size: 1.35rem; }
+    :root[data-size-topbar="lg"] #theme-toggle,
+    :root[data-size-topbar="lg"] #accent-picker > summary { width: 2.6rem; height: 2.6rem; font-size: 1.2rem; }
+    :root[data-size-topbar="lg"] #settings-panel > summary { width: 3.4rem; height: 3.4rem; font-size: 1.7rem; }
+    :root[data-size-topbar="lg"] .settings-popover { top: 3.7rem; }
+    /* List-view size control: text and its avatar scale together per one
+       control, per spec (they're visually one row-height unit). */
+    :root[data-size-list="sm"] ul.contacts li { font-size: .8em; }
+    :root[data-size-list="sm"] ul.contacts .avatar-sm { width: 1.15rem; height: 1.15rem; }
+    :root[data-size-list="sm"] ul.contacts .avatar-sm.initials { font-size: .44rem; }
+    :root[data-size-list="lg"] ul.contacts li { font-size: 1.35em; }
+    :root[data-size-list="lg"] ul.contacts .avatar-sm { width: 2.7rem; height: 2.7rem; }
+    :root[data-size-list="lg"] ul.contacts .avatar-sm.initials { font-size: 1.03rem; }
+    /* Card view: text and avatar are independent controls. */
+    :root[data-size-card-text="sm"] .contact-card { font-size: .8em; }
+    :root[data-size-card-text="lg"] .contact-card { font-size: 1.35em; }
+    :root[data-size-card-avatar="sm"] .contact-card .avatar { width: 2.6rem; height: 2.6rem; }
+    :root[data-size-card-avatar="sm"] .contact-card .avatar.initials { font-size: .85rem; }
+    :root[data-size-card-avatar="lg"] .contact-card .avatar { width: 6.4rem; height: 6.4rem; }
+    :root[data-size-card-avatar="lg"] .contact-card .avatar.initials { font-size: 2.08rem; }
+    /* Detail avatar: reuses the pre-existing sm 3rem / md 4rem / lg 8rem
+       scale from the removed inline toggle, now applied by root attribute
+       instead of an element attribute. */
+    :root[data-size-detail-avatar="sm"] #detail-avatar { width: 3rem; height: 3rem; }
+    :root[data-size-detail-avatar="sm"] #detail-avatar.initials { font-size: 1rem; }
+    :root[data-size-detail-avatar="lg"] #detail-avatar { width: 8rem; height: 8rem; }
+    :root[data-size-detail-avatar="lg"] #detail-avatar.initials { font-size: 2.6rem; }
+    /* Detail text: scoped to the detail page's own marked main element. A bare
+       element selector would also catch the index/form/birthdays pages (every
+       page has one) and, because the list/card size controls above use `em`
+       nested inside it, would compound with them multiplicatively. */
+    :root[data-size-detail-text="sm"] main.contact-detail { font-size: .8em; }
+    :root[data-size-detail-text="lg"] main.contact-detail { font-size: 1.35em; }
+    /* Field selection (issue #27): render-all + CSS-hide. Every toggleable
+       field is hidden by default inside its view container, then revealed
+       only when its token is present in the view's root attribute (whole-word
+       match via ~=, since the attribute holds a space-separated token list).
+       display values match each field's existing style (list = inline span
+       beside the name; card = block span stacked under it). */
+    ul.contacts .field-org, ul.contacts .field-phone, ul.contacts .field-email,
+    ul.contacts .field-bday, ul.contacts .field-url, ul.contacts .field-address { display: none; }
+    :root[data-list-fields~="org"] ul.contacts .field-org { display: inline; }
+    :root[data-list-fields~="phone"] ul.contacts .field-phone { display: inline; }
+    :root[data-list-fields~="email"] ul.contacts .field-email { display: inline; }
+    :root[data-list-fields~="bday"] ul.contacts .field-bday { display: inline; }
+    :root[data-list-fields~="url"] ul.contacts .field-url { display: inline; }
+    :root[data-list-fields~="address"] ul.contacts .field-address { display: inline; }
+    .contact-card .field-org, .contact-card .field-phone, .contact-card .field-email,
+    .contact-card .field-bday, .contact-card .field-url, .contact-card .field-address { display: none; }
+    :root[data-card-fields~="org"] .contact-card .field-org { display: block; }
+    :root[data-card-fields~="phone"] .contact-card .field-phone { display: block; }
+    :root[data-card-fields~="email"] .contact-card .field-email { display: block; }
+    :root[data-card-fields~="bday"] .contact-card .field-bday { display: block; }
+    :root[data-card-fields~="url"] .contact-card .field-url { display: block; }
+    :root[data-card-fields~="address"] .contact-card .field-address { display: block; }
+  </style>
+</head>
+<body>
+  {% block body %}{% endblock %}
+  <script>
+    function addRow(btn) {
+      const row = btn.parentElement.querySelector('.fieldrow');
+      const clone = row.cloneNode(true);
+      clone.querySelectorAll('input').forEach(i => i.value = '');
+      btn.before(clone);
+    }
+
+    (function () {
+      var STORAGE_KEY = 'peopledb-theme';
+      var btn = document.getElementById('theme-toggle');
+      if (!btn) return;
+
+      btn.addEventListener('click', function () {
+        // data-theme is always set by the pre-paint script, so this reads the
+        // effective theme (not just an explicit override) and flips it.
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+      });
+    })();
+
+    (function () {
+      // Accent picker: swatch clicks set a validated key on data-accent (CSS does
+      // the rest) and persist it. Mirrors the theme toggle's storage pattern.
+      var STORAGE_KEY = 'peopledb-accent';
+      var ACCENTS = { red: 1, orange: 1, green: 1, teal: 1, blue: 1, purple: 1, pink: 1,
+                      amber: 1, lime: 1, indigo: 1, magenta: 1, brown: 1, slate: 1 };
+      var picker = document.getElementById('accent-picker');
+      if (!picker) return;
+      var buttons = picker.querySelectorAll('[data-accent-choice]');
+
+      function current() {
+        var a = document.documentElement.getAttribute('data-accent');
+        return (a && ACCENTS[a]) ? a : 'red';
+      }
+      function mark() {
+        var cur = current();
+        buttons.forEach(function (b) {
+          b.setAttribute('aria-pressed',
+            b.getAttribute('data-accent-choice') === cur ? 'true' : 'false');
+        });
+      }
+      mark();
+
+      buttons.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var choice = b.getAttribute('data-accent-choice');
+          if (!ACCENTS[choice]) return;
+          // Red is the default (base :root rules); represented by the absence of
+          // the attribute so it also resets cleanly.
+          if (choice === 'red') {
+            document.documentElement.removeAttribute('data-accent');
+          } else {
+            document.documentElement.setAttribute('data-accent', choice);
+          }
+          try { localStorage.setItem(STORAGE_KEY, choice); } catch (e) {}
+          mark();
+          picker.removeAttribute('open');
+        });
+      });
+
+      // Light-dismiss: native <details> doesn't close on outside click or Escape.
+      // picker.contains(target) keeps summary/swatch clicks (handled above) from
+      // self-closing on the way out.
+      document.addEventListener('click', function (e) {
+        if (picker.open && !picker.contains(e.target)) picker.removeAttribute('open');
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && picker.open) {
+          picker.removeAttribute('open');
+          var s = picker.querySelector('summary');
+          if (s) s.focus();
+        }
+      });
+    })();
+
+    (function () {
+      // Settings popover: six segmented S/M/L groups, each declaring its own
+      // localStorage key + root attribute via data-* attributes so one
+      // handler drives all of them (rather than six near-identical copies of
+      // the accent-picker pattern). Applies instantly, no reload — unlike
+      // the List/Cards form beside it, which is a real POST.
+      var SIZES = { sm: 1, md: 1, lg: 1 };
+      var groups = document.querySelectorAll('.size-group');
+
+      groups.forEach(function (group) {
+        var storageKey = group.getAttribute('data-size-storage-key');
+        var attr = group.getAttribute('data-size-attr');
+        var buttons = group.querySelectorAll('[data-size-choice]');
+
+        function apply(size) {
+          // md is the default appearance; represented by the attribute's
+          // absence so it also resets cleanly (mirrors the accent picker's
+          // red-is-default handling).
+          if (size === 'md') {
+            document.documentElement.removeAttribute(attr);
+          } else {
+            document.documentElement.setAttribute(attr, size);
+          }
+          buttons.forEach(function (b) {
+            b.setAttribute('aria-pressed',
+              b.getAttribute('data-size-choice') === size ? 'true' : 'false');
+          });
+        }
+
+        var stored = null;
+        try { stored = localStorage.getItem(storageKey); } catch (e) {}
+        apply(SIZES[stored] ? stored : 'md');
+
+        buttons.forEach(function (b) {
+          b.addEventListener('click', function () {
+            var choice = b.getAttribute('data-size-choice');
+            if (!SIZES[choice]) return;
+            apply(choice);
+            try { localStorage.setItem(storageKey, choice); } catch (e) {}
+          });
+        });
+      });
+
+      // Light-dismiss: same pattern as the accent picker above.
+      var panel = document.getElementById('settings-panel');
+      if (!panel) return;
+      document.addEventListener('click', function (e) {
+        if (panel.open && !panel.contains(e.target)) panel.removeAttribute('open');
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && panel.open) {
+          panel.removeAttribute('open');
+          var s = panel.querySelector('summary');
+          if (s) s.focus();
+        }
+      });
+    })();
+
+    (function () {
+      // Field selection (issue #27): each .fields-group declares its own
+      // localStorage key + root attribute via data-* attributes, mirroring
+      // the size-group handler above. Same allow-list guard on write as the
+      // pre-paint script uses on read -- only known tokens ever reach
+      // localStorage or the DOM attribute. Keep in sync with the pre-paint
+      // FIELDS near the top of this file (separate script scope).
+      var FIELDS = { org: 1, phone: 1, email: 1, bday: 1, url: 1, address: 1 };
+      var groups = document.querySelectorAll('.fields-group');
+
+      groups.forEach(function (group) {
+        var storageKey = group.getAttribute('data-fields-storage-key');
+        var attr = group.getAttribute('data-fields-attr');
+        var boxes = group.querySelectorAll('input[type="checkbox"]');
+
+        // Reflect the current (pre-paint-applied) attribute value as checked
+        // state -- the popover is server-rendered and localStorage is
+        // client-only, so this can't be done server-side.
+        var current = document.documentElement.getAttribute(attr) || '';
+        var tokens = current.split(/\s+/).filter(function (t) { return FIELDS[t]; });
+        boxes.forEach(function (box) {
+          box.checked = tokens.indexOf(box.value) !== -1;
+        });
+
+        function apply() {
+          var checked = [];
+          boxes.forEach(function (box) {
+            if (box.checked && FIELDS[box.value]) checked.push(box.value);
+          });
+          var value = checked.join(' ');
+          document.documentElement.setAttribute(attr, value);
+          try { localStorage.setItem(storageKey, value); } catch (e) {}
+        }
+
+        boxes.forEach(function (box) {
+          box.addEventListener('change', apply);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

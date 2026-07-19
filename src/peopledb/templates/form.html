@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% import "_avatar.html" as avatar_macro %}
+{% block title %}{{ "Edit" if is_edit else "New" }} contact — peopleDB{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+<main>
+  <h2>{{ "Edit " + contact.formatted_name if is_edit else "New contact" }}</h2>
+  {% if conflict %}<div class="banner error">{{ conflict }}</div>{% endif %}
+  <form class="editor" method="post" action="{{ action }}" enctype="multipart/form-data">
+    {% if etag %}<input type="hidden" name="etag" value="{{ etag }}">{% endif %}
+
+    <fieldset id="photo-field">
+      <legend>Photo</legend>
+      <div class="fieldrow">
+        <div id="photo-preview-wrap">
+          {{ avatar_macro.avatar(contact) if contact else '' }}
+        </div>
+        <input id="photo-input" type="file" name="photo" accept="image/jpeg,image/png">
+      </div>
+      <div id="photo-crop-stage" hidden>
+        <div id="photo-crop-canvas-wrap">
+          <img id="photo-crop-source" alt="">
+          <canvas id="photo-crop-canvas"></canvas>
+        </div>
+        <p class="muted photo-crop-hint">Drag to reposition, drag the corner handle to resize.</p>
+      </div>
+      {% if contact and contact.has_photo %}
+      <label><input id="photo-remove" type="checkbox" name="photo_remove" value="1"> Remove current photo</label>
+      {% endif %}
+    </fieldset>
+
+    <label class="single">First name</label>
+    <input name="given" value="{{ contact.given if contact else '' }}">
+    <label class="single">Last name</label>
+    <input name="family" value="{{ contact.family if contact else '' }}">
+    <label class="single">Company</label>
+    <input name="org" value="{{ contact.org if contact else '' }}">
+    <label class="single">Birthday (YYYY-MM-DD)</label>
+    <input name="bday" value="{{ contact.bday if contact else '' }}" placeholder="1990-06-01">
+
+    {% if not is_edit %}
+    <fieldset id="groups-field">
+      <legend>Groups</legend>
+      {% for g in groups %}
+      <label class="fieldrow"><input type="checkbox" name="group_uid" value="{{ g.uid }}"{{ ' checked' if g.checked else '' }}> {{ g.name }}</label>
+      {% else %}
+      <p class="muted">No groups yet.</p>
+      {% endfor %}
+      {% for name in unmatched_groups %}
+      <p class="muted">No group named "{{ name }}" — not assigned.</p>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+
+    {% for prefix, title, items, placeholder in [
+      ("phone", "Phones", contact.phones if contact else [], "+1 555 0100"),
+      ("email", "Emails", contact.emails if contact else [], "name@example.com"),
+      ("url", "URLs", contact.urls if contact else [], "https://…"),
+      ("related", "Related people", contact.related if contact else [], "Full name"),
+    ] %}
+    <fieldset>
+      <legend>{{ title }}</legend>
+      {% for label, value in items %}
+      <div class="fieldrow">
+        <input class="label" name="{{ prefix }}_label" value="{{ label }}" placeholder="label">
+        <input class="value" name="{{ prefix }}_value" value="{{ value }}" placeholder="{{ placeholder }}">
+      </div>
+      {% else %}
+      <div class="fieldrow">
+        <input class="label" name="{{ prefix }}_label" placeholder="label">
+        <input class="value" name="{{ prefix }}_value" placeholder="{{ placeholder }}">
+      </div>
+      {% endfor %}
+      <button type="button" onclick="addRow(this)">+ add</button>
+    </fieldset>
+    {% endfor %}
+
+    <fieldset>
+      <legend>Addresses</legend>
+      {% for label, parts in (contact.addresses if contact else []) %}
+      <div class="fieldrow">
+        <input class="label" name="adr_label" value="{{ label }}" placeholder="label">
+        <input class="value" name="adr_street" value="{{ parts.street }}" placeholder="street">
+        <input class="value" name="adr_city" value="{{ parts.city }}" placeholder="city">
+        <input class="value" name="adr_region" value="{{ parts.region }}" placeholder="state">
+        <input class="value" name="adr_code" value="{{ parts.code }}" placeholder="postal code">
+        <input class="value" name="adr_country" value="{{ parts.country }}" placeholder="country">
+        {# pobox/extended are usually invisible pass-through, but when populated
+           they must be visible: otherwise the row looks blank yet can never be
+           cleared (blank-row rule counts them), and hiding real data invites
+           accidental loss. #}
+        {% if parts.pobox %}<input class="value" name="adr_pobox" value="{{ parts.pobox }}" placeholder="po box">
+        {% else %}<input type="hidden" name="adr_pobox" value="{{ parts.pobox }}">{% endif %}
+        {% if parts.extended %}<input class="value" name="adr_extended" value="{{ parts.extended }}" placeholder="unit / floor">
+        {% else %}<input type="hidden" name="adr_extended" value="{{ parts.extended }}">{% endif %}
+      </div>
+      {% else %}
+      <div class="fieldrow">
+        <input class="label" name="adr_label" placeholder="label">
+        <input class="value" name="adr_street" placeholder="street">
+        <input class="value" name="adr_city" placeholder="city">
+        <input class="value" name="adr_region" placeholder="state">
+        <input class="value" name="adr_code" placeholder="postal code">
+        <input class="value" name="adr_country" placeholder="country">
+        <input type="hidden" name="adr_pobox" value="">
+        <input type="hidden" name="adr_extended" value="">
+      </div>
+      {% endfor %}
+      <button type="button" onclick="addRow(this)">+ add</button>
+    </fieldset>
+
+    <label class="single">Note</label>
+    <textarea name="note" rows="3" style="width:100%">{{ contact.note if contact else '' }}</textarea>
+    <div class="actions">
+      <button class="primary">Save</button>
+      <a href="{{ '/contacts/' + contact.uid if is_edit else '/' }}"><button type="button">Cancel</button></a>
+    </div>
+  </form>
+</main>
+<script>
+  (function () {
+    // Photo preview + crop (issues #14, #17). Progressive enhancement: if any
+    // required browser API is missing, bail out entirely and let the form
+    // submit the original file exactly as before.
+    var input = document.getElementById('photo-input');
+    var form = input ? input.closest('form') : null;
+    var previewWrap = document.getElementById('photo-preview-wrap');
+    var stage = document.getElementById('photo-crop-stage');
+    var sourceImg = document.getElementById('photo-crop-source');
+    var canvas = document.getElementById('photo-crop-canvas');
+    var removeCheckbox = document.getElementById('photo-remove');
+    if (!input || !form || !previewWrap || !stage || !sourceImg || !canvas) return;
+    if (!window.HTMLCanvasElement || !canvas.getContext || !window.DataTransfer) return;
+
+    var ACCEPTED_TYPES = { 'image/jpeg': 1, 'image/png': 1 };
+    var HANDLE_DISPLAY_SIZE = 18; // px, drawn size of the resize handle
+    // Coarse pointers (touch) get a generous hit-zone extending outside the
+    // handle -- a fingertip can't aim at an 18px square. A mouse gets a zone
+    // that matches the visible handle exactly (see hitTest), so clicking just
+    // outside the corner moves rather than resizes.
+    var COARSE_POINTER = false;
+    try { COARSE_POINTER = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+    var MIN_CROP_NATURAL = 20; // px, smallest allowed square in source-image space
+    var MAX_EXPORT_SIZE = 1024; // px, exported crop is capped (server resizes to 512 anyway)
+    var ctx = canvas.getContext('2d');
+
+    var originalPreviewHTML = previewWrap.innerHTML;
+    var previewCanvas = null; // lazily created .avatar-sized canvas showing the live crop
+
+    // Natural-pixel-space crop rect: { x, y, size }. Null until a valid image loads.
+    var crop = null;
+    var naturalW = 0, naturalH = 0;
+    var scale = 1; // display px per natural px
+    var currentObjectURL = null;
+    var exportToken = 0;
+    var pendingExport = null;
+    var submitBlocked = false;
+    var submitPending = false;
+
+    function revokeCurrentURL() {
+      if (currentObjectURL) {
+        try { URL.revokeObjectURL(currentObjectURL); } catch (e) {}
+        currentObjectURL = null;
+      }
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function defaultCrop() {
+      var size = Math.min(naturalW, naturalH);
+      return { x: (naturalW - size) / 2, y: (naturalH - size) / 2, size: size };
+    }
+
+    function clampCrop(c) {
+      // For images smaller than MIN_CROP_NATURAL in either dimension, the
+      // "minimum" must yield to the image's own size, or clamp(v, lo, hi)
+      // gets lo > hi and forces a square bigger than the source image.
+      var minSize = Math.min(MIN_CROP_NATURAL, naturalW, naturalH);
+      var size = clamp(c.size, minSize, Math.min(naturalW, naturalH));
+      var x = clamp(c.x, 0, naturalW - size);
+      var y = clamp(c.y, 0, naturalH - size);
+      return { x: x, y: y, size: size };
+    }
+
+    function layoutCanvas() {
+      // Canvas overlay is sized/positioned to exactly cover the rendered <img>.
+      var dispW = sourceImg.clientWidth;
+      var dispH = sourceImg.clientHeight;
+      if (!dispW || !dispH) return;
+      scale = dispW / naturalW;
+      var dpr = window.devicePixelRatio || 1;
+      canvas.style.width = dispW + 'px';
+      canvas.style.height = dispH + 'px';
+      canvas.width = Math.round(dispW * dpr);
+      canvas.height = Math.round(dispH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function drawOverlay() {
+      if (!crop) return;
+      var dispW = sourceImg.clientWidth, dispH = sourceImg.clientHeight;
+      ctx.clearRect(0, 0, dispW, dispH);
+      var dx = crop.x * scale, dy = crop.y * scale, ds = crop.size * scale;
+
+      // Dim everything outside the selection.
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, dispW, dy);
+      ctx.fillRect(0, dy + ds, dispW, dispH - dy - ds);
+      ctx.fillRect(0, dy, dx, ds);
+      ctx.fillRect(dx + ds, dy, dispW - dx - ds, ds);
+
+      // Selection outline, using --accent so it reads in both themes.
+      var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = accent;
+      ctx.strokeRect(dx + 1, dy + 1, ds - 2, ds - 2);
+
+      // Corner resize handle, bottom-right.
+      ctx.fillStyle = accent;
+      var hs = HANDLE_DISPLAY_SIZE;
+      ctx.fillRect(dx + ds - hs, dy + ds - hs, hs, hs);
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(dx + ds - hs + 2, dy + ds - hs + 2, hs - 4, hs - 4);
+    }
+
+    function ensurePreviewCanvas() {
+      if (previewCanvas && previewCanvas.isConnected) return previewCanvas;
+      previewCanvas = document.createElement('canvas');
+      previewCanvas.className = 'avatar';
+      previewCanvas.width = 256;
+      previewCanvas.height = 256;
+      previewWrap.innerHTML = '';
+      previewWrap.appendChild(previewCanvas);
+      return previewCanvas;
+    }
+
+    function drawLivePreview() {
+      // Cheap synchronous redraw for responsive feedback while dragging --
+      // no toBlob round-trip here, just a canvas copy of the crop region.
+      if (!crop) return;
+      var pc = ensurePreviewCanvas();
+      var pctx = pc.getContext('2d');
+      // White background, not clearRect: mirrors the server's flatten color
+      // (photos.py composites transparent PNG pixels onto white), so the
+      // preview matches what will actually be saved.
+      pctx.fillStyle = '#fff';
+      pctx.fillRect(0, 0, pc.width, pc.height);
+      pctx.drawImage(sourceImg, crop.x, crop.y, crop.size, crop.size, 0, 0, pc.width, pc.height);
+    }
+
+    function exportCrop() {
+      // Exports the current crop to a JPEG blob and swaps it into the file
+      // input via DataTransfer, so the submitted file always matches what's
+      // shown. Guarded against out-of-order completion with a token, and the
+      // submit handler awaits this promise so a mid-drag submit still gets a
+      // consistent file.
+      if (!crop) return Promise.resolve();
+      var myToken = ++exportToken;
+      var outSize = Math.min(crop.size, MAX_EXPORT_SIZE);
+      var out = document.createElement('canvas');
+      out.width = outSize;
+      out.height = outSize;
+      var octx = out.getContext('2d');
+      // toBlob('image/jpeg') composites transparent pixels onto black unless
+      // told otherwise. The server flattens onto white (photos.py), so a
+      // cropped PNG upload must match that -- fill white before drawing.
+      octx.fillStyle = '#fff';
+      octx.fillRect(0, 0, outSize, outSize);
+      octx.drawImage(sourceImg, crop.x, crop.y, crop.size, crop.size, 0, 0, outSize, outSize);
+      return new Promise(function (resolve) {
+        out.toBlob(function (blob) {
+          if (myToken !== exportToken || !blob) { resolve(); return; }
+          try {
+            var file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+          } catch (e) {
+            // DataTransfer/File construction failing leaves the original
+            // file in place -- server still gets a valid upload, just
+            // uncropped.
+          }
+          resolve();
+        }, 'image/jpeg', 0.92);
+      });
+    }
+
+    function scheduleExport() {
+      pendingExport = exportCrop();
+      return pendingExport;
+    }
+
+    function pointFromEvent(evt) {
+      var rect = canvas.getBoundingClientRect();
+      var dx = evt.clientX - rect.left;
+      var dy = evt.clientY - rect.top;
+      return { x: dx / scale, y: dy / scale }; // natural-pixel space
+    }
+
+    function hitTest(pt) {
+      var hs = HANDLE_DISPLAY_SIZE / scale;
+      // The handle is drawn inside the bottom-right corner, spanning `hs`
+      // inward. Match the hit-zone to that visible square on a mouse; coarse
+      // pointers also get `hs` of outward margin for a fatter target.
+      var pad = COARSE_POINTER ? hs : 0;
+      var withinHandle =
+        pt.x >= crop.x + crop.size - hs && pt.x <= crop.x + crop.size + pad &&
+        pt.y >= crop.y + crop.size - hs && pt.y <= crop.y + crop.size + pad;
+      if (withinHandle) return 'resize';
+      var within = pt.x >= crop.x && pt.x <= crop.x + crop.size &&
+                   pt.y >= crop.y && pt.y <= crop.y + crop.size;
+      if (within) return 'move';
+      return null;
+    }
+
+    var dragMode = null;
+    var dragStart = null;
+    var cropStart = null;
+
+    canvas.addEventListener('pointerdown', function (evt) {
+      if (!crop) return;
+      var pt = pointFromEvent(evt);
+      dragMode = hitTest(pt);
+      if (!dragMode) return;
+      dragStart = pt;
+      cropStart = { x: crop.x, y: crop.y, size: crop.size };
+      try { canvas.setPointerCapture(evt.pointerId); } catch (e) {}
+      evt.preventDefault();
+    });
+
+    canvas.addEventListener('pointermove', function (evt) {
+      if (!dragMode || !crop) return;
+      var pt = pointFromEvent(evt);
+      var deltaX = pt.x - dragStart.x;
+      var deltaY = pt.y - dragStart.y;
+      if (dragMode === 'move') {
+        crop = clampCrop({ x: cropStart.x + deltaX, y: cropStart.y + deltaY, size: cropStart.size });
+      } else if (dragMode === 'resize') {
+        // Keep the top-left corner anchored; resize by the larger of the two
+        // deltas so diagonal drags feel natural, then clamp square to the image.
+        var delta = Math.max(deltaX, deltaY);
+        var maxSize = Math.min(naturalW - cropStart.x, naturalH - cropStart.y);
+        var minSize = Math.min(MIN_CROP_NATURAL, maxSize);
+        var size = clamp(cropStart.size + delta, minSize, maxSize);
+        crop = { x: cropStart.x, y: cropStart.y, size: size };
+      }
+      drawOverlay();
+      drawLivePreview();
+      evt.preventDefault();
+    });
+
+    function endDrag(evt) {
+      if (!dragMode) return;
+      dragMode = null;
+      try { canvas.releasePointerCapture(evt.pointerId); } catch (e) {}
+      scheduleExport();
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+
+    function showRemovedState() {
+      previewWrap.hidden = true;
+      stage.hidden = true;
+      revokeCurrentURL();
+      crop = null;
+    }
+
+    function restoreOriginalPreview() {
+      previewWrap.hidden = false;
+      previewWrap.innerHTML = originalPreviewHTML;
+      previewCanvas = null;
+    }
+
+    function activateCropUI(file) {
+      revokeCurrentURL();
+      currentObjectURL = URL.createObjectURL(file);
+      sourceImg.onload = function () {
+        naturalW = sourceImg.naturalWidth;
+        naturalH = sourceImg.naturalHeight;
+        if (!naturalW || !naturalH) return;
+        crop = defaultCrop();
+        stage.hidden = false;
+        previewWrap.hidden = false;
+        // Layout depends on the image's rendered (display) size, which is
+        // only final once it's laid out in the DOM.
+        requestAnimationFrame(function () {
+          layoutCanvas();
+          drawOverlay();
+          drawLivePreview();
+          scheduleExport();
+        });
+      };
+      sourceImg.src = currentObjectURL;
+    }
+
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) {
+        stage.hidden = true;
+        return;
+      }
+      if (!ACCEPTED_TYPES[file.type]) {
+        // Unsupported type: don't crash, let the form submit it as-is --
+        // the server rejects it with its existing error.
+        stage.hidden = true;
+        return;
+      }
+      if (removeCheckbox) removeCheckbox.checked = false;
+      activateCropUI(file);
+    });
+
+    if (removeCheckbox) {
+      removeCheckbox.addEventListener('change', function () {
+        if (removeCheckbox.checked) {
+          input.value = '';
+          showRemovedState();
+        } else {
+          restoreOriginalPreview();
+        }
+      });
+    }
+
+    window.addEventListener('resize', function () {
+      if (!crop || stage.hidden) return;
+      layoutCanvas();
+      drawOverlay();
+    });
+
+    form.addEventListener('submit', function (evt) {
+      if (submitBlocked) { submitBlocked = false; return; }
+      if (!crop || stage.hidden) return; // no active crop -- submit original file untouched
+      evt.preventDefault();
+      // Single-flight: submitBlocked only covers the programmatic resubmit
+      // below; a rapid second user click would otherwise start its own
+      // export->resubmit chain and double-POST the form.
+      if (submitPending) return;
+      submitPending = true;
+      // pendingExport may be stale (crop mutates on every pointermove, but
+      // the promise is only refreshed at drag-end/load). Re-schedule from the
+      // current crop synchronously so a mid-drag submit can't ship an old file.
+      scheduleExport();
+      Promise.resolve(pendingExport).then(function () {
+        submitBlocked = true;
+        if (form.requestSubmit) form.requestSubmit();
+        else form.submit();
+      });
+    });
+  })();
+</script>
+{% endblock %}

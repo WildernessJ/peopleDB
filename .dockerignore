@@ -1,0 +1,41 @@
+# Keep the build context small and reproducible. The image builds its own
+# Linux .venv via `uv sync --frozen`; never ship the host's venv or caches.
+
+# Version control / editor / OS cruft
+.git
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Host virtualenv (wrong platform) and Python caches
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Test / tooling artifacts
+.pytest_cache/
+.hypothesis/
+tests/
+
+# Local data — never bake a cache DB into the image
+*.db
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Secrets & local config
+.env
+.env.*
+*.secret
+config.local.*
+.workflow.yaml
+
+# Docs and infra not needed at runtime
+docs/
+specs/
+.github/
+unraid/

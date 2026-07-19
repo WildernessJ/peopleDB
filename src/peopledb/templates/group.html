@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ group.formatted_name }} — peopleDB{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+<main>
+  <h2>{{ group.formatted_name }} <span class="muted">(group)</span></h2>
+  {% if conflict %}<div class="banner error">{{ conflict }}</div>{% endif %}
+
+  <form method="post" action="/groups/{{ group.uid }}" style="display:flex; gap:.5rem;">
+    <input name="name" value="{{ group.formatted_name }}" style="flex:1">
+    <button>Rename</button>
+  </form>
+
+  <h3>Members</h3>
+  <ul class="contacts">
+    {% for rec in member_contacts %}
+    <li style="display:flex; justify-content:space-between; align-items:center;">
+      <a href="/contacts/{{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</a>
+      <form method="post" action="/groups/{{ group.uid }}/members/{{ rec.contact.uid }}/remove">
+        <button class="danger">Remove</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="muted">No members yet.</li>
+    {% endfor %}
+  </ul>
+
+  {% if candidates %}
+  <form method="post" action="/groups/{{ group.uid }}/members"
+        style="margin-top:.8rem; display:flex; gap:.5rem;">
+    <select name="member_uid" style="flex:1">
+      {% for rec in candidates %}
+      <option value="{{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary">Add member</button>
+  </form>
+  {% endif %}
+
+  <div class="actions">
+    <form method="post" action="/groups/{{ group.uid }}/delete"
+          onsubmit="return confirm('Delete this group? Contacts are not deleted.');">
+      <button class="danger">Delete group</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

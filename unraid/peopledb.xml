@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Docker template for peopleDB — a managed container in the Docker tab
+  pulling ghcr.io/wildernessj/peopledb:latest.
+
+  One-time setup on the Unraid host before the image will pull (it is private):
+    docker login ghcr.io -u <github-user> -p <read-only PAT with read:packages>
+
+  Install: Docker tab -> Add Container -> paste this template's path, or drop this
+  file in /boot/config/plugins/dockerMan/templates-user/ and pick it from the list.
+  Then fill PEOPLEDB_DAV_URL and PEOPLEDB_SECRET_KEY (both required) and start.
+
+  Generate a fixed PEOPLEDB_SECRET_KEY once and keep it (changing it logs everyone
+  out — see ADR-0003). The README "Running with Docker" section has the exact
+  one-liner to generate a Fernet key from the image.
+
+  Two fresh-deploy gotchas (full detail + literal commands in the README "Unraid"
+  section — kept out of this comment because XML comments cannot contain a double
+  hyphen, see PITFALLS.md):
+    - The container runs as uid/gid 999. The /data (appdata) bind path must be
+      writable by 999, or the app crashes on boot ("unable to open database file").
+      Unraid creates a new bind path as root; chown it to 999 once.
+    - Host port 8000 is a common collision (e.g. Paperless). If the bind fails,
+      change the WebUI Port field to a free host port; the container port stays 8000.
+    - To front this with a reverse proxy, move it off the default bridge onto the
+      proxy's Docker network so the proxy can resolve it by container name.
+
+  Committed values below are PLACEHOLDERS — never commit real credentials or the
+  real DAV URL. Fill them in the Unraid form; they live only on the Unraid host.
+-->
+<Container version="2">
+  <Name>peopleDB</Name>
+  <Repository>ghcr.io/wildernessj/peopledb:latest</Repository>
+  <Registry>https://github.com/WildernessJ/peopleDB/pkgs/container/peopledb</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/WildernessJ/peopleDB/issues</Support>
+  <Project>https://github.com/WildernessJ/peopleDB</Project>
+  <Overview>A Cardhop-style web client for a CardDAV contacts server. Sign in with your CardDAV account; the server stays canonical while peopleDB keeps a disposable local cache in /data for speed.</Overview>
+  <Category>Productivity: Other:</Category>
+  <WebUI>http://[IP]:[PORT:8000]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Description>Browse, search, add/edit contacts, groups, relationships, and birthdays over CardDAV, from any browser. The SQLite cache in /data is a disposable mirror of the server and survives container recreation.</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8000</HostPort>
+        <ContainerPort>8000</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/peopledb</HostDir>
+      <ContainerDir>/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>https://dav.example.org/dav.php</Value>
+      <Name>PEOPLEDB_DAV_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>PEOPLEDB_SECRET_KEY</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>1</Value>
+      <Name>PEOPLEDB_SECURE_COOKIES</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>default</Value>
+      <Name>PEOPLEDB_WRITE_ADDRESSBOOK</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+
+  <Config Name="WebUI Port" Target="8000" Default="8000" Mode="tcp" Description="Host port for the web UI." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Cache dir (/data)" Target="/data" Default="/mnt/user/appdata/peopledb" Mode="rw" Description="Holds the disposable SQLite cache (peopledb-cache.db + WAL sidecars). Safe to delete; it re-syncs." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peopledb</Config>
+  <Config Name="PEOPLEDB_DAV_URL" Target="PEOPLEDB_DAV_URL" Default="" Mode="" Description="Base URL of your CardDAV server (e.g. Baikal's /dav.php)." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="PEOPLEDB_SECRET_KEY" Target="PEOPLEDB_SECRET_KEY" Default="" Mode="" Description="Fixed Fernet key encrypting session credentials. Generate once and keep it — changing/omitting it logs everyone out on restart. See the template comment for how to generate." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="PEOPLEDB_SECURE_COOKIES" Target="PEOPLEDB_SECURE_COOKIES" Default="1" Mode="" Description="1 requires HTTPS for the session cookie (default). Set 0 only if serving plain HTTP with no TLS in front, or login will appear to fail." Type="Variable" Display="always" Required="false" Mask="false">1</Config>
+  <Config Name="PEOPLEDB_WRITE_ADDRESSBOOK" Target="PEOPLEDB_WRITE_ADDRESSBOOK" Default="default" Mode="" Description="Which addressbook new contacts/groups are written to, matched by displayname or path segment. Falls back to the first discovered if no match." Type="Variable" Display="advanced" Required="false" Mask="false">default</Config>
+</Container>

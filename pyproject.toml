@@ -1,0 +1,41 @@
+[project]
+name = "peopledb"
+version = "0.1.0"
+description = "Cardhop-style web client for a CardDAV server (Baikal)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "WildernessJ", email = "59486664+WildernessJ@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=49.0.0",
+    "fastapi>=0.139.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "pillow>=12.3.0",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.51.0",
+    "vobject>=0.9.9",
+]
+
+[project.scripts]
+peopledb = "peopledb:main"
+
+[build-system]
+requires = ["uv_build>=0.9.2,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "hypothesis>=6.156.6",
+    "pytest>=9.1.1",
+    "radicale>=3.7.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: tests that run against a live local CardDAV server"]
+addopts = "-m 'not live'"

@@ -1,0 +1,10 @@
+<ul class="contacts">
+  {% for rec in candidates %}
+  <li>
+    <a href="/contacts/{{ uid }}/merge?with={{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</a>
+    {% if rec.contact.org %}<span class="org field-org"><span class="sr-only">Org: </span>{{ rec.contact.org }}</span>{% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No contacts found.</li>
+  {% endfor %}
+</ul>

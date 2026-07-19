@@ -1,0 +1,11 @@
+{% macro avatar(contact, small=false, id=none) %}
+{% set cls = "avatar-sm" if small else "avatar" %}
+{# id is auto-escaped inline (no |safe) so a caller can never inject markup. #}
+{% if contact.photo_b64 %}
+<img class="{{ cls }}"{% if id %} id="{{ id }}"{% endif %} src="/contacts/{{ contact.uid }}/photo" alt="{{ contact.formatted_name }}">
+{% elif contact.photo_uri %}
+<img class="{{ cls }}"{% if id %} id="{{ id }}"{% endif %} src="{{ contact.photo_uri|safe_url }}" alt="{{ contact.formatted_name }}">
+{% else %}
+<span class="{{ cls }} initials"{% if id %} id="{{ id }}"{% endif %} aria-hidden="true">{{ contact.initials }}</span>
+{% endif %}
+{% endmacro %}

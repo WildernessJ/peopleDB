@@ -1,0 +1,125 @@
+{# Shared top bar for authenticated pages (index/detail/form/group/birthdays/
+   merge). login.html deliberately omits it: no Sign out / controls pre-auth.
+   The palette/theme/gear controls live here in the header flow (they used to be
+   position:fixed in base.html). The JS that drives them stays in base.html and
+   binds by id/class -- those still resolve because this partial renders inside
+   {% block body %}, before that end-of-body script; on pages without this bar
+   (login) the handlers no-op via their `if (!el) return` guards.
+   Set `show_search` truthy before the include to render the centered search +
+   quick-add (index only). #}
+<header class="topbar">
+  <a class="brand" href="/"><img class="brand-icon" src="/static/peopledb-icon.png" alt="">peopleDB</a>
+  <div class="topbar-center">
+    {% if show_search is defined and show_search %}
+    <input class="search" type="search" name="q" placeholder="Search contacts…"
+           hx-get="/search" hx-trigger="input changed delay:200ms, keyup[key=='Enter']"
+           hx-target="#contact-list" autofocus>
+    <form class="quick-add" method="get" action="/contacts/new">
+      <input type="search" name="q" placeholder="Quick add — name, email, phone…">
+      <button type="submit">Add</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="topbar-controls">
+    <details id="accent-picker" title="Accent color">
+      <summary aria-label="Choose accent color">🎨</summary>
+      <div class="swatches" role="group" aria-label="Accent color">
+        <button type="button" data-accent-choice="red"    style="--sw:#c23a31" aria-label="Red"></button>
+        <button type="button" data-accent-choice="orange" style="--sw:#a85a00" aria-label="Orange"></button>
+        <button type="button" data-accent-choice="green"  style="--sw:#1f7a3d" aria-label="Green"></button>
+        <button type="button" data-accent-choice="teal"   style="--sw:#0f7a83" aria-label="Teal"></button>
+        <button type="button" data-accent-choice="blue"   style="--sw:#1666cf" aria-label="Blue"></button>
+        <button type="button" data-accent-choice="purple" style="--sw:#7a3fd0" aria-label="Purple"></button>
+        <button type="button" data-accent-choice="pink"   style="--sw:#c02b6f" aria-label="Pink"></button>
+        <button type="button" data-accent-choice="amber"  style="--sw:#8a6a00" aria-label="Amber"></button>
+        <button type="button" data-accent-choice="lime"   style="--sw:#4a7a12" aria-label="Lime"></button>
+        <button type="button" data-accent-choice="indigo" style="--sw:#4048c9" aria-label="Indigo"></button>
+        <button type="button" data-accent-choice="magenta" style="--sw:#a92c8f" aria-label="Magenta"></button>
+        <button type="button" data-accent-choice="brown"  style="--sw:#7a4a28" aria-label="Brown"></button>
+        <button type="button" data-accent-choice="slate"  style="--sw:#586273" aria-label="Slate"></button>
+      </div>
+    </details>
+    <button id="theme-toggle" type="button" title="Toggle color theme" aria-label="Toggle color theme">◐</button>
+    <details id="settings-panel" title="Display settings">
+      <summary aria-label="Display settings">⚙</summary>
+      <div class="settings-popover" role="group" aria-label="Display settings">
+        <div class="size-group" data-size-storage-key="peopledb-size-topbar" data-size-attr="data-size-topbar">
+          <span class="size-label">Top bar</span>
+          <span class="size-toggle" role="group" aria-label="Top bar size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <div class="size-group" data-size-storage-key="peopledb-size-list" data-size-attr="data-size-list">
+          <span class="size-label">List view</span>
+          <span class="size-toggle" role="group" aria-label="List view size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <div class="size-group" data-size-storage-key="peopledb-size-card-text" data-size-attr="data-size-card-text">
+          <span class="size-label">Card text</span>
+          <span class="size-toggle" role="group" aria-label="Card text size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <div class="size-group" data-size-storage-key="peopledb-size-card-avatar" data-size-attr="data-size-card-avatar">
+          <span class="size-label">Card avatar</span>
+          <span class="size-toggle" role="group" aria-label="Card avatar size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <!-- Reuses the pre-existing peopledb-avatar-size key from the removed
+             detail-page inline toggle, so prior choices survive the move. -->
+        <div class="size-group" data-size-storage-key="peopledb-avatar-size" data-size-attr="data-size-detail-avatar">
+          <span class="size-label">Detail avatar</span>
+          <span class="size-toggle" role="group" aria-label="Detail avatar size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <div class="size-group" data-size-storage-key="peopledb-size-detail-text" data-size-attr="data-size-detail-text">
+          <span class="size-label">Detail text</span>
+          <span class="size-toggle" role="group" aria-label="Detail text size">
+            <button type="button" data-size-choice="sm" aria-label="Small">S</button>
+            <button type="button" data-size-choice="md" aria-label="Medium">M</button>
+            <button type="button" data-size-choice="lg" aria-label="Large">L</button>
+          </span>
+        </div>
+        <!-- Field selection (issue #27): which fields render in list/card views.
+             Checked state is set client-side on load (localStorage-driven, not
+             server-rendered) by the fields-group handler below. -->
+        <div class="fields-group" data-fields-storage-key="peopledb-list-fields" data-fields-attr="data-list-fields">
+          <span class="size-label">List fields</span>
+          <span class="fields-toggle" role="group" aria-label="List fields">
+            <label><input type="checkbox" value="org">Org</label>
+            <label><input type="checkbox" value="phone">Phone</label>
+            <label><input type="checkbox" value="email">Email</label>
+            <label><input type="checkbox" value="bday">Birthday</label>
+            <label><input type="checkbox" value="url">URL</label>
+            <label><input type="checkbox" value="address">Address</label>
+          </span>
+        </div>
+        <div class="fields-group" data-fields-storage-key="peopledb-card-fields" data-fields-attr="data-card-fields">
+          <span class="size-label">Card fields</span>
+          <span class="fields-toggle" role="group" aria-label="Card fields">
+            <label><input type="checkbox" value="org">Org</label>
+            <label><input type="checkbox" value="phone">Phone</label>
+            <label><input type="checkbox" value="email">Email</label>
+            <label><input type="checkbox" value="bday">Birthday</label>
+            <label><input type="checkbox" value="url">URL</label>
+            <label><input type="checkbox" value="address">Address</label>
+          </span>
+        </div>
+      </div>
+    </details>
+    <form class="inline" method="post" action="/logout"><button>Sign out</button></form>
+  </div>
+</header>

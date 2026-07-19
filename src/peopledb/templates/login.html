@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign in — peopleDB{% endblock %}
+{% block body %}
+<main style="max-width: 22rem; margin-top: 4rem;">
+  <h1>peopleDB</h1>
+  <p class="muted">Sign in with your CardDAV (Baikal) account.</p>
+  {% if error %}<div class="banner error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <p><input name="username" placeholder="Username" required autofocus style="width:100%"></p>
+    <p><input name="password" type="password" placeholder="Password" required style="width:100%"></p>
+    <p><button class="primary" style="width:100%">Sign in</button></p>
+  </form>
+</main>
+{% endblock %}

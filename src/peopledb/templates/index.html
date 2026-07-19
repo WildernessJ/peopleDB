@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block body %}
+{% set show_search = true %}
+{% include "_topbar.html" %}
+<main class="contact-index">
+  {% if offline %}
+  <div class="banner warn">CardDAV server unreachable — showing cached data, which may
+    be stale. Editing is disabled until the server is back.
+    <a href="/refresh">Retry</a></div>
+  {% endif %}
+  {% if broken %}
+  <div class="banner warn">{{ broken|length }} card(s) could not be parsed:
+    {% for b in broken %}<code>{{ b.href }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  <section style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+    <a href="/"><button type="button" {% if not active_group %}class="primary"{% endif %}>All</button></a>
+    {% for g in groups %}
+    <a href="/?group={{ g.contact.uid }}">
+      <button type="button" {% if active_group and active_group.contact.uid == g.contact.uid %}class="primary"{% endif %}>
+        {{ g.contact.formatted_name }}</button></a>
+    {% endfor %}
+    {% if active_group %}
+    <a href="/groups/{{ active_group.contact.uid }}" class="muted">manage</a>
+    {% endif %}
+    <form method="post" action="/groups" style="display:flex; gap:.4rem; margin-left:auto;">
+      <input name="name" placeholder="New group…" required>
+      <button>Create</button>
+    </form>
+  </section>
+  <section class="view-toggle" style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;">
+    <a href="/contacts/new"><button class="primary" type="button">New contact</button></a>
+    <a href="/birthdays"><button type="button">Birthdays</button></a>
+    <form method="post" action="/view" style="display:flex; gap:.4rem; margin-left:auto;">
+      <button type="submit" name="view" value="list" {% if view != "card" %}class="primary"{% endif %}>List</button>
+      <button type="submit" name="view" value="card" {% if view == "card" %}class="primary"{% endif %}>Cards</button>
+    </form>
+  </section>
+  <div id="contact-list">
+    {% include "_contacts.html" %}
+  </div>
+</main>
+{% endblock %}

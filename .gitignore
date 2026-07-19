@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Secrets & local config — NEVER commit CardDAV credentials or server URLs
+.env
+.env.*
+*.secret
+config.local.*
+.workflow.yaml
+.workflow-run.json
+.flow-audit.md
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+*.egg-info/
+dist/
+
+# Local data
+*.db
+*.sqlite3
+peopledb-cache.db-shm
+peopledb-cache.db-wal

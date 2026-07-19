@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Merge contacts — peopleDB{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+<main>
+  <h2>Merge {{ contact_a.contact.formatted_name }} with {{ contact_b.contact.formatted_name }}</h2>
+  {% if conflict %}<div class="banner error">{{ conflict }}</div>{% endif %}
+  <p class="muted">
+    The keeper survives and keeps its UID, photo (unless overridden below), and any
+    unknown custom properties. The other card is deleted -- its own unknown
+    properties are lost when it goes.
+  </p>
+  <form class="editor" method="post" action="/contacts/{{ contact_a.contact.uid }}/merge">
+    <input type="hidden" name="with" value="{{ contact_b.contact.uid }}">
+
+    <fieldset>
+      <legend>Keeper</legend>
+      <label class="fieldrow">
+        <input type="radio" name="keeper_uid" value="{{ contact_a.contact.uid }}"
+               {{ "checked" if keeper_uid == contact_a.contact.uid else "" }}>
+        {{ contact_a.contact.formatted_name }} (survives)
+      </label>
+      <label class="fieldrow">
+        <input type="radio" name="keeper_uid" value="{{ contact_b.contact.uid }}"
+               {{ "checked" if keeper_uid == contact_b.contact.uid else "" }}>
+        {{ contact_b.contact.formatted_name }} (survives)
+      </label>
+    </fieldset>
+
+    {% for field_name, title, a_value, b_value in [
+      ("name", "Name", contact_a.contact.given ~ " " ~ contact_a.contact.family, contact_b.contact.given ~ " " ~ contact_b.contact.family),
+      ("org", "Company", contact_a.contact.org, contact_b.contact.org),
+      ("bday", "Birthday", contact_a.contact.bday, contact_b.contact.bday),
+      ("note", "Note", contact_a.contact.note, contact_b.contact.note),
+    ] %}
+    <fieldset>
+      <legend>{{ title }}</legend>
+      <label class="fieldrow"><input type="radio" name="{{ field_name }}_choice" value="a" {{ "checked" if keeper_uid == contact_a.contact.uid else "" }}> {{ a_value or "(blank)" }} <span class="muted">({{ contact_a.contact.formatted_name }})</span></label>
+      <label class="fieldrow"><input type="radio" name="{{ field_name }}_choice" value="b" {{ "checked" if keeper_uid == contact_b.contact.uid else "" }}> {{ b_value or "(blank)" }} <span class="muted">({{ contact_b.contact.formatted_name }})</span></label>
+    </fieldset>
+    {% endfor %}
+
+    {% if contact_a.contact.has_photo or contact_b.contact.has_photo %}
+    <fieldset>
+      <legend>Photo</legend>
+      <label class="fieldrow"><input type="radio" name="photo_choice" value="a" {{ "checked" if keeper_uid == contact_a.contact.uid else "" }}> Use {{ contact_a.contact.formatted_name }}'s photo</label>
+      {% if contact_b.contact.has_photo %}
+      <label class="fieldrow"><input type="radio" name="photo_choice" value="b" {{ "checked" if keeper_uid == contact_b.contact.uid else "" }}> Use {{ contact_b.contact.formatted_name }}'s photo</label>
+      {% endif %}
+      <label class="fieldrow"><input type="radio" name="photo_choice" value="remove"> Remove photo</label>
+    </fieldset>
+    {% endif %}
+
+    {% for prefix, title, items in [
+      ("email", "Emails", emails),
+      ("phone", "Phones", phones),
+      ("url", "URLs", urls),
+      ("related", "Related people", related),
+    ] %}
+    <fieldset>
+      <legend>{{ title }}</legend>
+      {% for i, (label, value) in items %}
+      <label class="fieldrow">
+        <input type="checkbox" name="{{ prefix }}_keep" value="{{ i }}" checked> {{ label or prefix }}: {{ value }}
+      </label>
+      <input type="hidden" name="{{ prefix }}_label_{{ i }}" value="{{ label }}">
+      <input type="hidden" name="{{ prefix }}_value_{{ i }}" value="{{ value }}">
+      {% else %}
+      <p class="muted">None.</p>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+
+    <fieldset>
+      <legend>Addresses</legend>
+      {% for i, (label, parts) in addresses %}
+      <label class="fieldrow">
+        <input type="checkbox" name="adr_keep" value="{{ i }}" checked> {{ label or "address" }}: {{ parts.formatted }}
+      </label>
+      <input type="hidden" name="adr_label_{{ i }}" value="{{ label }}">
+      <input type="hidden" name="adr_street_{{ i }}" value="{{ parts.street }}">
+      <input type="hidden" name="adr_city_{{ i }}" value="{{ parts.city }}">
+      <input type="hidden" name="adr_region_{{ i }}" value="{{ parts.region }}">
+      <input type="hidden" name="adr_code_{{ i }}" value="{{ parts.code }}">
+      <input type="hidden" name="adr_country_{{ i }}" value="{{ parts.country }}">
+      <input type="hidden" name="adr_pobox_{{ i }}" value="{{ parts.pobox }}">
+      <input type="hidden" name="adr_extended_{{ i }}" value="{{ parts.extended }}">
+      {% else %}
+      <p class="muted">None.</p>
+      {% endfor %}
+    </fieldset>
+
+    <div class="actions">
+      <button class="primary">Merge</button>
+      <a href="/contacts/{{ contact_a.contact.uid }}"><button type="button">Cancel</button></a>
+    </div>
+  </form>
+</main>
+{% endblock %}

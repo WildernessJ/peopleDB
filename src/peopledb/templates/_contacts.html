@@ -1,0 +1,36 @@
+{% import "_avatar.html" as avatar_macro %}
+{% if view == "card" %}
+<ul class="contact-cards">
+  {% for rec in contacts %}
+  <li class="contact-card">
+    {{ avatar_macro.avatar(rec.contact) }}
+    <a href="/contacts/{{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</a>
+    {% if rec.contact.org %}<span class="org field-org"><span class="sr-only">Org: </span>{{ rec.contact.org }}</span>{% endif %}
+    {% if rec.contact.phones %}<span class="detail field-phone"><span class="sr-only">Phone: </span>{{ rec.contact.phones[0][1] }}</span>{% endif %}
+    {% if rec.contact.emails %}<span class="detail field-email"><span class="sr-only">Email: </span>{{ rec.contact.emails[0][1] }}</span>{% endif %}
+    {% if rec.contact.bday %}<span class="detail field-bday"><span class="sr-only">Birthday: </span>{{ rec.contact.bday }}</span>{% endif %}
+    {% if rec.contact.urls %}<span class="detail field-url"><span class="sr-only">URL: </span>{{ rec.contact.urls[0][1] }}</span>{% endif %}
+    {% if rec.contact.addresses and rec.contact.addresses[0][1].formatted %}<span class="detail field-address"><span class="sr-only">Address: </span>{{ rec.contact.addresses[0][1].formatted }}</span>{% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No contacts found.</li>
+  {% endfor %}
+</ul>
+{% else %}
+<ul class="contacts">
+  {% for rec in contacts %}
+  <li>
+    {{ avatar_macro.avatar(rec.contact, small=true) }}
+    <a href="/contacts/{{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</a>
+    {% if rec.contact.org %}<span class="org field-org"><span class="sr-only">Org: </span>{{ rec.contact.org }}</span>{% endif %}
+    {% if rec.contact.phones %}<span class="detail field-phone"><span class="sr-only">Phone: </span>{{ rec.contact.phones[0][1] }}</span>{% endif %}
+    {% if rec.contact.emails %}<span class="detail field-email"><span class="sr-only">Email: </span>{{ rec.contact.emails[0][1] }}</span>{% endif %}
+    {% if rec.contact.bday %}<span class="detail field-bday"><span class="sr-only">Birthday: </span>{{ rec.contact.bday }}</span>{% endif %}
+    {% if rec.contact.urls %}<span class="detail field-url"><span class="sr-only">URL: </span>{{ rec.contact.urls[0][1] }}</span>{% endif %}
+    {% if rec.contact.addresses and rec.contact.addresses[0][1].formatted %}<span class="detail field-address"><span class="sr-only">Address: </span>{{ rec.contact.addresses[0][1].formatted }}</span>{% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No contacts found.</li>
+  {% endfor %}
+</ul>
+{% endif %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "_avatar.html" as avatar_macro %}
+{% block title %}{{ contact.formatted_name }} — peopleDB{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+<main class="contact-detail">
+  {% if conflict %}<div class="banner error">{{ conflict }}</div>{% endif %}
+  {% if group_warn %}<div class="banner warn">Contact saved, but could not be added to: {{ group_warn }}.</div>{% endif %}
+  {% if merge_warn %}<div class="banner warn">Merge completed with warnings: {{ merge_warn }}.</div>{% endif %}
+  {{ avatar_macro.avatar(contact, id="detail-avatar") }}
+  <h2>{{ contact.formatted_name }}</h2>
+  {% if contact.org %}<p class="muted">{{ contact.org }}</p>{% endif %}
+  {# Suppress the bordered box entirely when there are no fields to show
+     (e.g. a bare group has no contact fields) -- an empty <dl> renders as an
+     empty bordered box. See issue #32. #}
+  {% if contact.has_display_fields %}
+  <dl class="card">
+    {% for label, value in contact.phones %}
+    <dt>{{ label or "phone" }}</dt>
+    <dd><a href="tel:{{ value|telify }}">{{ value }}</a>
+        <a class="muted" href="sms:{{ value|telify }}">message</a></dd>
+    {% endfor %}
+    {% for label, value in contact.emails %}
+    <dt>{{ label or "email" }}</dt>
+    <dd><a href="mailto:{{ value }}">{{ value }}</a></dd>
+    {% endfor %}
+    {% for label, value in contact.urls %}
+    <dt>{{ label or "url" }}</dt>
+    <dd><a href="{{ value|safe_url }}" rel="noopener">{{ value }}</a></dd>
+    {% endfor %}
+    {% for label, parts in contact.addresses %}
+    <dt>{{ label or "address" }}</dt>
+    <dd><a href="{{ parts.formatted|maps_url }}" rel="noopener">{{ parts.formatted }}</a></dd>
+    {% endfor %}
+    {% for label, value in contact.related %}
+    <dt>{{ label or "related" }}</dt>
+    <dd>
+      {% if related_uids and related_uids.get(value) %}
+      <a href="/contacts/{{ related_uids[value] }}">{{ value }}</a>
+      {% else %}{{ value }}{% endif %}
+    </dd>
+    {% endfor %}
+    {% if contact.bday %}<dt>birthday</dt><dd>{{ contact.bday }}</dd>{% endif %}
+    {% if contact.note %}<dt>note</dt><dd>{{ contact.note }}</dd>{% endif %}
+  </dl>
+  {% endif %}
+  <div class="actions">
+    <a href="/contacts/{{ contact.uid }}/edit"><button type="button">Edit</button></a>
+    <form method="post" action="/contacts/{{ contact.uid }}/delete"
+          onsubmit="return confirm('Delete this contact? This deletes it on the server.');">
+      <button class="danger">Delete</button>
+    </form>
+  </div>
+  {# Group merges are rejected downstream (app.py: is_group -> conflict), so the
+     picker is a dead-end control on a group's own detail page -- hide it. #}
+  {% if not contact.is_group %}
+  <section class="merge-picker" style="margin-top:.8rem;">
+    <label for="merge-search">Merge with…</label>
+    <input id="merge-search" class="search" type="search" name="q" placeholder="Search contacts…"
+           hx-get="/contacts/{{ contact.uid }}/merge/search" hx-trigger="input changed delay:200ms, keyup[key=='Enter']"
+           hx-target="#merge-candidates">
+    <div id="merge-candidates"></div>
+  </section>
+  {% endif %}
+</main>
+{% endblock %}

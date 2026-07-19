@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Birthdays — peopleDB{% endblock %}
+{% block body %}
+{% include "_topbar.html" %}
+<main>
+  <h2>Upcoming birthdays</h2>
+  <ul class="contacts">
+    {% for nxt, age, rec in upcoming %}
+    <li style="display:flex; justify-content:space-between;">
+      <a href="/contacts/{{ rec.contact.uid }}">{{ rec.contact.formatted_name }}</a>
+      <span class="muted">
+        {{ nxt|bday_date }}{% if nxt == today %} — today!{% endif %}
+        {% if age %} (turns {{ age }}){% endif %}
+      </span>
+    </li>
+    {% else %}
+    <li class="muted">No birthdays on file.</li>
+    {% endfor %}
+  </ul>
+  <p class="muted" style="margin-top:1.2rem;">
+    Subscribe from any calendar app for reminders:<br>
+    <code id="feed-url">{{ feed_url }}</code>
+  </p>
+</main>
+{% endblock %}
