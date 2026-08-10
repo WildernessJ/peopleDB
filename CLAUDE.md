@@ -42,54 +42,27 @@ The resolved shape of the system (the *why* for each is an ADR in [`docs/DECISIO
 
 ## Workflow
 
-Follows the global **Coding Workflow (v3 — model-per-phase, adopted 2026-08-09)** section in
-`~/.claude/CLAUDE.md`, driven by `/flow`: **one change, three phases, three sessions** — plan and
-review on the judgment model (default Fable), execute on the volume model (default Opus). Models are
-defaults, not mandates. What is fixed is **phase discipline** (convention, not enforced — nothing can
-read the session model): plan and review never implement, review runs in a **fresh** session, build
-never merges.
+The doctrine itself is one canonical doc in `jason-claude-skills`, imported below.
+`docs/coding-workflow.md` is a **gitignored symlink** created by that repo's `install.sh` —
+so for anyone cloning this public repo the import silently resolves to nothing, which is
+fine: it carries no peopleDB-specific instruction. Edit doctrine there, never here.
 
-- **Plan** (`/flow start`) — sitrep → worktree off `main` → settle design → **write and commit
-  `specs/<slug>.md` on the feature branch** → light checkpoint on `main` (PROJECT_STATE in-flight
-  line + one-line RUN_LOG; not the full `/checkpoint`). Ends at the spec, no implementation.
-- **Execute** (`/flow build`) — arm `pending_verify: <slug>` in the MAIN checkout's `.workflow.yaml`
-  **first, before implementing**, so a dead session can't end silently → build strictly from the
-  spec, dispatching per its Execution routing → `uv run pytest -q` green → commit the whole change.
-  Ambiguity or a stop criterion → append it to the spec's Execution Log and **halt**; design
-  questions go back to a plan session.
-- **Review** (`/flow review`, fresh session) — `verifier` + spec-conformance + the session's own
-  judgment pass → `/session-audit` → live-verify → merge → clear `pending_verify` → full
-  `/checkpoint`. `live_verify_mode: browser`, so `/flow review --auto` may self-verify — it prefers
-  the `pytest -q -m live` command where that covers the change, and drives the card-view /
-  quick-entry routes via Claude-in-Chrome for UI-only work.
+@./docs/coding-workflow.md
 
-**Floor:** trivial changes (a one-liner, a small bugfix) skip the cycle — fix in session with a repro
-test; the GitHub issue is the spec. No handoff without a spec, no spec without a handoff.
+Repo-specific deviations and config only, from here down.
 
 **Concurrency work goes to `executor-max`.** This repo's per-user locks, `asyncio.to_thread` DAV I/O,
 and connection-per-thread SQLite are exactly the shared-mutable-state shape that tier exists for
 (ADR-0004, PITFALLS). Route it there in the spec's Execution routing section, and send anything
 touching auth or the Fernet session store to the `security` agent.
 
-- **Artifacts scale with the change.** ADRs in [`docs/DECISIONS/`](docs/DECISIONS/) (MADR format) only for
-  hard-to-reverse, surprising trade-offs. **Specs are the v3 artifact, not v2's 30–60-line sketch**:
-  `specs/<slug>.md`, committed on the feature branch, required for anything above the floor, with all
-  eight sections — Intent · Design · Implementation plan (files, seams, signatures, edge cases) ·
-  Execution routing · Tests (red-first list) · Verification (exact commands, done-looks-like) · Stop
-  criteria · Execution Log (appended during execution). It freezes as history after merge.
-- **Testing by change type.** Feature → `/tdd`. Bug → failing repro test first. Refactor → keep suite green.
-  Network/UI-flavored work → live-verify against a real (or test) CardDAV server.
-- **One review per change before merge:** dispatch the `verifier` agent on the full **committed** diff
-  (untracked files are invisible to a diff ref), plus a spec-conformance check where a spec exists.
-  Filter the report — the verifier reports everything and tags low-relevance items rather than
-  withholding. `/code-review` is Jason's to fire by choice: Claude cannot invoke it (it is
-  `disable-model-invocation`), must never claim it ran, and must never ask him to run it.
+- **Live-verify is repo-shaped.** `live_verify_mode: browser`, so `/flow review --auto` may
+  self-verify: it prefers `uv run pytest -q -m live` where that covers the change, and drives
+  the card-view / quick-entry routes via Claude-in-Chrome for UI-only work. Network-flavored
+  work verifies against a real (or test) CardDAV server.
+- **Suite:** `uv run pytest -q`. ADRs in [`docs/DECISIONS/`](docs/DECISIONS/); specs in `specs/`.
 - **Bugs & enhancements are tracked as GitHub issues** (`WildernessJ/peopleDB`), not as lists in
   repo docs. File findings with `gh issue create` (labels: `bug` / `enhancement`).
-- **Checkpointing is phase-specific under v3.** The plan session ends with a *light* checkpoint on
-  `main` (in-flight line + one-line RUN_LOG, done by hand — the `/checkpoint` skill has no light
-  mode); the review session ends with the full `/checkpoint`, closing the cycle the plan opened.
-  Outside a `/flow` cycle, end substantive sessions with `/checkpoint` as before.
 
 ## Context system (the memory spine)
 

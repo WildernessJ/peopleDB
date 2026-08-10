@@ -30,3 +30,7 @@ peopledb-cache.db-wal
 
 # Local Claude Code workflow tooling (hooks, checkpoint skill) — maintainer-only
 .claude/
+
+# Coding doctrine: symlink to jason-claude-skills/doctrine/coding-workflow.md,
+# created by that repo's install.sh. Local-only — the target is a machine path.
+docs/coding-workflow.md
