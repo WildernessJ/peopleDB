@@ -343,3 +343,12 @@ via the computer tool instead, then confirm the POST in the app log.
   supported `gh`/REST path and the default `gh` token lacks `write:packages`, so it's a manual step.
   (3) The **Social preview** image can only be uploaded once the repo is already public. Sequence the
   go-live runbook accordingly, and don't advertise a `docker pull` in the README until the package is public.
+
+## Local-only refs still carry pre-scrub history — never `git push --all` / `--tags`
+
+- **Symptom:** none until it's too late — a bulk push republishes deleted history.
+- **Wrong:** assuming the 2026-07-19 security re-audit (stale branch `fix/18-crop-hit-zone` deleted from
+  origin) cleaned everything; local refs were left intact deliberately.
+- **Correct:** push branches individually. Local-only refs still contain the old un-scrubbed history;
+  `git push --all` or `git push --tags` would re-upload it. (Recorded at go-public, 2026-07-19; moved here
+  from the vault's active-work dashboard 2026-08-10.)
