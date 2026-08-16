@@ -42,12 +42,10 @@ The resolved shape of the system (the *why* for each is an ADR in [`docs/DECISIO
 
 ## Workflow
 
-The doctrine itself is one canonical doc in `jason-claude-skills`, imported below.
-`docs/coding-workflow.md` is a **gitignored symlink** created by that repo's `install.sh` —
-so for anyone cloning this public repo the import silently resolves to nothing, which is
-fine: it carries no peopleDB-specific instruction. Edit doctrine there, never here.
-
 @./docs/coding-workflow.md
+
+(For anyone cloning this public repo: that import is a gitignored symlink and silently
+resolves to nothing — fine, it carries no peopleDB-specific instruction.)
 
 Repo-specific deviations and config only, from here down.
 
